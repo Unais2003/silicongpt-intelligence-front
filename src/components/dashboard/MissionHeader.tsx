@@ -37,6 +37,7 @@ function Cell({
 }
 
 export function MissionHeader() {
+  const t = useClock();
   const time = t ? t.toISOString().slice(11, 19) + " UTC" : "--:--:-- UTC";
   const date = t ? t.toISOString().slice(0, 10) : "----------";
 
