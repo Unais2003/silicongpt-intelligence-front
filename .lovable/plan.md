@@ -1,53 +1,32 @@
-# Plan — Make the Next-Step Prediction Panel Readable
-
-## Problem
-Today the panel renders as a cramped line:
-`Predicting after step 5: PHOTORESIST COAT 1 RECEIVE WAFER LOT 100.0% 2 LOT IDENTIFICATION 0.0% …4ms`
-
-There's no visual separation between the header, the five candidates, and the latency. Users can't tell:
-- what "next step" means
-- which step is the current/observed one
-- that the rows are ranked candidates with probabilities
-- which one the model is actually picking
-- whether any candidate matches the ground-truth next step
-
 ## Goal
-Turn the block into a clearly labeled "what comes next?" card with an obvious context line, ranked candidates as bars, a highlighted #1 pick, and a ground-truth check.
+Move the probability bar from below the token name onto the same row, so each candidate is a single horizontal line: rank · token · bar (fills remaining width) · percentage. Removes the vertical gap currently created by the bar wrapping under the token.
 
-## New layout (top → bottom)
+## Change (single file: `src/components/dashboard/ProcessLab.tsx`, lines ~670–728)
 
-1. **Context header** — two short lines, plain English:
-   - Eyebrow: `NEXT-STEP PREDICTION`
-   - Line: `Given step N — "<current step name>", the model ranks the 5 most likely next steps.`
+Restructure each candidate row in the next-step prediction panel:
 
-2. **Current → Next visual** — small inline chip pair:
-   `[ Step N · CURRENT STEP NAME ]  →  [ Step N+1 · ? ]`
-   Makes the "predicting the step after this" idea explicit.
+Before (stacked):
+```
+#1  TOKEN NAME ✓               100.0%
+    ████████████████████████
+```
 
-3. **Ranked candidates list (top 5)** — each row:
-   - Rank pill (`#1`…`#5`), #1 emphasized
-   - Token name (larger, readable)
-   - Horizontal probability bar (full-width, not 48px), gradient-filled for #1, muted for the rest
-   - Probability % right-aligned, tabular
-   - If a candidate matches the true next step: green `✓ matches actual next step` badge on that row
-   - Top pick row gets a subtle `bg-surface` background + left accent border so it reads as "the prediction"
+After (inline):
+```
+#1  TOKEN NAME ✓  ████████████████  100.0%
+```
 
-4. **Footer meta** — right-aligned, muted:
-   `Top-1 confidence 100.0% · inference 4 ms`
-   Plus a tiny legend: `✓ = ground-truth next step from the recipe`
-
-## Empty / loading / error states
-- Loading: keep skeleton rows but label them `awaiting model…`
-- Error: keep current red error line, prefixed `Prediction failed ·`
-- No ground-truth match in top-5: show muted note `Actual next step not in top 5`
-
-## Scope
-- Single file: `src/components/dashboard/ProcessLab.tsx`, the predictions panel around lines 619–684
-- Pure presentation change. No changes to data fetching, server functions, or the prediction logic
-- Use existing design tokens (`--info`, `--success`, `surface`, `muted-foreground`) — no new colors
-- Keep `motion` entrance animations; widen the probability bar to use available row width
+Specifically, inside the `results.map` row:
+- Keep the outer `motion.div` flex row (rank pill + content + percentage).
+- Replace the inner `<div className="flex-1 min-w-0">` (which stacked token name above the bar) with a single flex row containing:
+  - token name (`truncate`, no longer growing — fixed/auto width via `shrink-0` or `max-w-[40%]`)
+  - optional `✓ actual next step` badge (`shrink-0`)
+  - probability bar wrapper as `flex-1` (the bar now fills the remaining row width, `h-1.5` unchanged)
+- Remove the `mt-1` on the bar wrapper since it's no longer below anything.
+- Keep rank pill (`w-7`) and right-aligned `%` column (`w-14`) unchanged.
+- Keep top-1 emphasis (`bg-surface`, accent border, larger text on token + %).
+- Keep entrance animation and bar fill animation.
 
 ## Out of scope
-- Token-square strip and Complete-tab visualization (untouched)
-- Backend / model / API
-- Other panels in `/lab`
+- Header, current→next chips, footer meta, skeleton/error states (unchanged).
+- Any other panel or styling token.

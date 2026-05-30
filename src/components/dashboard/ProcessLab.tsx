@@ -691,22 +691,20 @@ function PredictTab({
               >
                 #{i + 1}
               </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`font-mono truncate ${
-                      isTop ? "text-sm text-foreground" : "text-xs text-muted-foreground"
-                    }`}
-                  >
-                    {r.token}
+              <div className="flex-1 min-w-0 flex items-center gap-3">
+                <span
+                  className={`font-mono truncate shrink-0 max-w-[45%] ${
+                    isTop ? "text-sm text-foreground" : "text-xs text-muted-foreground"
+                  }`}
+                >
+                  {r.token}
+                </span>
+                {isTrue && (
+                  <span className="text-[var(--success)] text-tiny font-mono whitespace-nowrap shrink-0">
+                    ✓ actual next step
                   </span>
-                  {isTrue && (
-                    <span className="text-[var(--success)] text-tiny font-mono whitespace-nowrap">
-                      ✓ actual next step
-                    </span>
-                  )}
-                </div>
-                <div className="mt-1 h-1.5 bg-surface overflow-hidden">
+                )}
+                <div className="flex-1 h-1.5 bg-surface overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${r.prob * 100}%` }}
