@@ -1,4 +1,6 @@
+import * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
+
 import { ModelArchitecture } from "@/components/dashboard/ModelArchitecture";
 import { ResearchFindings } from "@/components/dashboard/ResearchFindings";
 import { SectionHeading, PageFooter, PageHeader } from "@/components/dashboard/layout";
