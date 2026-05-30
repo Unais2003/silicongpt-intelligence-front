@@ -353,8 +353,8 @@ function Top5Box() {
   const c = COLORS.green;
   return (
     <div
-      className="relative w-full rounded-md border border-border px-3 py-2"
-      style={{ backgroundColor: tint(c, 9), borderLeft: `3px solid ${c}` }}
+      className="relative w-full rounded-xl border-2 px-4 py-3"
+      style={{ backgroundColor: tint(c, 9), borderColor: c }}
     >
       <div className="font-mono text-xs font-semibold uppercase tracking-wide mb-1.5">
         Top-5 Predictions
