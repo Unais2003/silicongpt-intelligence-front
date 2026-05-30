@@ -103,12 +103,6 @@ function ArchitecturePage() {
         <ModelArchitecture />
       </div>
 
-      <div className="px-4 md:px-6 lg:px-8 py-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Task1Panel />
-          <Task3Panel />
-        </div>
-      </div>
 
       <PageFooter />
     </main>
