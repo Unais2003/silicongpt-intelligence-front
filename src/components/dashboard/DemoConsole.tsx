@@ -2,19 +2,51 @@ import { useMemo, useState } from "react";
 import { Panel, StatusDot } from "./primitives";
 import { motion } from "framer-motion";
 
-const TOKENS = ["LITH", "DEV", "ETCH", "STRP", "CLN", "DIFF", "DEP", "CMP", "ION", "OXD", "ANN", "METR"];
+const TOKENS = [
+  "PRE CLEAN WAFER",
+  "THERMAL OXIDATION",
+  "DEPOSIT POLYSILICON",
+  "ALIGN MASK LEVEL 1",
+  "EXPOSE LITHO LEVEL 1",
+  "DEVELOP PHOTORESIST",
+  "OXIDE ETCH",
+  "STRIP PHOTORESIST",
+  "IMPLANT WELL",
+  "RAPID THERMAL ANNEAL",
+  "DEPOSIT INTERLAYER DIELECTRIC",
+  "CMP DIELECTRIC",
+];
 
 const RULES: Record<string, { token: string; name: string; p: number }[]> = {
-  LITH: [{ token: "DEV", name: "Develop", p: 0.91 }, { token: "INSP", name: "Inspect", p: 0.06 }, { token: "STRP", name: "Strip", p: 0.03 }],
-  DEV: [{ token: "ETCH", name: "Plasma Etch", p: 0.84 }, { token: "INSP", name: "Inspect", p: 0.11 }, { token: "STRP", name: "Strip", p: 0.05 }],
-  ETCH: [{ token: "STRP", name: "Resist Strip", p: 0.77 }, { token: "CLN", name: "Wet Clean", p: 0.18 }, { token: "METR", name: "Metrology", p: 0.05 }],
-  STRP: [{ token: "CLN", name: "Wet Clean", p: 0.88 }, { token: "METR", name: "Metrology", p: 0.08 }, { token: "DIFF", name: "Diffusion", p: 0.04 }],
-  CLN: [{ token: "DIFF", name: "Diffusion", p: 0.74 }, { token: "DEP", name: "PECVD", p: 0.18 }, { token: "ION", name: "Ion Implant", p: 0.05 }],
-  DEFAULT: [{ token: "METR", name: "Metrology", p: 0.55 }, { token: "INSP", name: "Inspect", p: 0.28 }, { token: "CLN", name: "Wet Clean", p: 0.17 }],
+  "PRE CLEAN WAFER": [
+    { token: "THERMAL OXIDATION", name: "Thermal Oxidation", p: 0.71 },
+    { token: "DEPOSIT POLYSILICON", name: "Deposit Poly", p: 0.18 },
+    { token: "ALIGN MASK LEVEL 1", name: "Align Mask L1", p: 0.11 },
+  ],
+  "DEVELOP PHOTORESIST": [
+    { token: "OXIDE ETCH", name: "Oxide Etch", p: 0.84 },
+    { token: "STRIP PHOTORESIST", name: "Strip Resist", p: 0.09 },
+    { token: "IMPLANT WELL", name: "Implant Well", p: 0.07 },
+  ],
+  "OXIDE ETCH": [
+    { token: "STRIP PHOTORESIST", name: "Strip Resist", p: 0.79 },
+    { token: "IMPLANT WELL", name: "Implant Well", p: 0.14 },
+    { token: "RAPID THERMAL ANNEAL", name: "RTA", p: 0.07 },
+  ],
+  "STRIP PHOTORESIST": [
+    { token: "IMPLANT WELL", name: "Implant Well", p: 0.67 },
+    { token: "RAPID THERMAL ANNEAL", name: "RTA", p: 0.21 },
+    { token: "PRE CLEAN WAFER", name: "Pre Clean", p: 0.12 },
+  ],
+  DEFAULT: [
+    { token: "RAPID THERMAL ANNEAL", name: "RTA", p: 0.52 },
+    { token: "DEPOSIT INTERLAYER DIELECTRIC", name: "Deposit ILD", p: 0.31 },
+    { token: "CMP DIELECTRIC", name: "CMP", p: 0.17 },
+  ],
 };
 
 export function DemoConsole() {
-  const [seq, setSeq] = useState<string[]>(["LITH", "DEV", "ETCH"]);
+  const [seq, setSeq] = useState<string[]>(["PRE CLEAN WAFER", "THERMAL OXIDATION"]);
 
   const preds = useMemo(() => {
     const last = seq[seq.length - 1];
