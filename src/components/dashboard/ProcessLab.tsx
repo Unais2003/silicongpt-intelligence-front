@@ -755,36 +755,27 @@ function CompleteTab({
         Completing {prefix.length}-step prefix → generating up to 220 steps
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="flex items-center gap-1.5 min-w-max pb-1">
-          {prefix.map((tok, i) => (
-            <span
-              key={`p-${i}`}
-              className="font-mono text-xs px-2 py-1 border border-border bg-background text-muted-foreground whitespace-nowrap"
-            >
-              <span className="opacity-60 mr-1 tabular">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              {tok}
-            </span>
-          ))}
-          <span className="h-6 border-r border-border-strong mx-1" />
-          {out.map((tok, i) => (
-            <motion.span
-              key={`g-${i}`}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="font-mono text-xs px-2 py-1 border border-[var(--info)] bg-[var(--info)] text-white whitespace-nowrap"
-            >
-              {tok}
-            </motion.span>
-          ))}
-          {running && (
-            <span className="font-mono text-xs px-2 py-1 border border-border bg-surface animate-pulse">
-              …
-            </span>
-          )}
-        </div>
+      <div className="flex flex-wrap gap-[3px]">
+        {prefix.map((tok, i) => (
+          <span
+            key={`p-${i}`}
+            title={`${String(i + 1).padStart(2, "0")} · ${tok}`}
+            className="h-3 w-3 border border-foreground/30 bg-foreground/40"
+          />
+        ))}
+        <span className="w-px mx-0.5 bg-border-strong" />
+        {out.map((tok, i) => (
+          <motion.span
+            key={`g-${i}`}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            title={`${String(prefix.length + i + 1).padStart(2, "0")} · ${tok}`}
+            className="h-3 w-3 border border-[var(--info)] bg-[var(--info)]"
+          />
+        ))}
+        {running && (
+          <span className="h-3 w-3 border border-border bg-surface animate-pulse" />
+        )}
       </div>
 
       <div className="flex items-center gap-2">
