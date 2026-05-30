@@ -615,59 +615,113 @@ function PredictTab({
   }, [cursor, steps.join("|")]);
 
   const trueNext = steps[cursor + 1] ?? null;
+  const top1 = results[0] ?? null;
+  const trueInTop5 = !!trueNext && results.some((r) => r.token === trueNext);
 
   return (
     <div className="space-y-4">
-      <div className="text-tiny font-mono text-muted-foreground">
-        Predicting after step {cursor + 1}:{" "}
-        <span className="text-foreground">{steps[cursor] ?? "—"}</span>
+      {/* Context header */}
+      <div className="space-y-1">
+        <div className="text-tiny font-mono uppercase tracking-wider text-muted-foreground">
+          Next-step prediction
+        </div>
+        <div className="text-xs font-mono text-muted-foreground leading-relaxed">
+          Given step {cursor + 1} —{" "}
+          <span className="text-foreground">
+            "{steps[cursor] ?? "—"}"
+          </span>
+          , the model ranks the 5 most likely next steps.
+        </div>
       </div>
 
-      <div className="space-y-2">
+      {/* Current → Next chips */}
+      <div className="flex items-center gap-2 flex-wrap text-tiny font-mono">
+        <span className="px-2 py-1 border border-border-strong bg-surface">
+          <span className="text-muted-foreground">step {cursor + 1} · </span>
+          <span className="text-foreground">{steps[cursor] ?? "—"}</span>
+        </span>
+        <span className="text-muted-foreground">→</span>
+        <span className="px-2 py-1 border border-dashed border-[var(--info)] text-[var(--info)]">
+          step {cursor + 2} · ?
+        </span>
+      </div>
+
+      {/* Ranked candidates */}
+      <div className="space-y-1.5">
         {error && (
           <div className="text-xs font-mono text-destructive break-words">
-            backend error · {error}
+            Prediction failed · {error}
           </div>
         )}
         {!error && running && results.length === 0 && (
           <>
+            <div className="text-tiny font-mono text-muted-foreground">
+              awaiting model…
+            </div>
             {[0, 1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="h-6 bg-surface animate-pulse"
+                className="h-9 bg-surface animate-pulse"
                 style={{ opacity: 1 - i * 0.15 }}
               />
             ))}
           </>
         )}
         {results.map((r, i) => {
-          const isTrue = trueNext && r.token === trueNext;
+          const isTrue = !!trueNext && r.token === trueNext;
+          const isTop = i === 0;
           return (
             <motion.div
               key={`${r.token}-${i}`}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.06 }}
-              className="flex items-center gap-3"
+              className={`relative flex items-center gap-3 px-2 py-1.5 border-l-2 ${
+                isTop
+                  ? "bg-surface border-[var(--info)]"
+                  : "border-transparent"
+              }`}
             >
-              <span className="w-4 font-mono text-tiny text-muted-foreground tabular">
-                {i + 1}
+              <span
+                className={`w-7 text-center font-mono text-tiny tabular px-1 py-0.5 ${
+                  isTop
+                    ? "bg-[var(--info)] text-background"
+                    : "text-muted-foreground"
+                }`}
+              >
+                #{i + 1}
               </span>
-              <span className="flex-1 font-mono text-sm flex items-center gap-2">
-                {r.token}
-                {isTrue && (
-                  <span className="text-[var(--success)] text-tiny">✓</span>
-                )}
-              </span>
-              <div className="w-48 bg-surface h-1.5 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${r.prob * 100}%` }}
-                  transition={{ duration: 0.6, delay: i * 0.06, ease: "easeOut" }}
-                  className="h-full bg-[var(--info)]"
-                />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`font-mono truncate ${
+                      isTop ? "text-sm text-foreground" : "text-xs text-muted-foreground"
+                    }`}
+                  >
+                    {r.token}
+                  </span>
+                  {isTrue && (
+                    <span className="text-[var(--success)] text-tiny font-mono whitespace-nowrap">
+                      ✓ actual next step
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 h-1.5 bg-surface overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${r.prob * 100}%` }}
+                    transition={{ duration: 0.6, delay: i * 0.06, ease: "easeOut" }}
+                    className={`h-full ${
+                      isTop ? "bg-[var(--info)]" : "bg-muted-foreground/40"
+                    }`}
+                  />
+                </div>
               </div>
-              <span className="w-12 text-right font-mono text-xs tabular">
+              <span
+                className={`w-14 text-right font-mono tabular ${
+                  isTop ? "text-sm text-foreground" : "text-xs text-muted-foreground"
+                }`}
+              >
                 {(r.prob * 100).toFixed(1)}%
               </span>
             </motion.div>
@@ -675,14 +729,27 @@ function PredictTab({
         })}
       </div>
 
-      {latency != null && !running && (
-        <div className="text-tiny font-mono text-muted-foreground">
-          {latency.toFixed(0)}ms
+      {/* Footer meta */}
+      {results.length > 0 && !running && (
+        <div className="flex items-center justify-between gap-3 flex-wrap pt-1 border-t border-border-strong">
+          <div className="text-tiny font-mono text-muted-foreground">
+            ✓ = ground-truth next step from the recipe
+            {trueNext && !trueInTop5 && (
+              <span className="ml-2 text-[var(--warning,var(--destructive))]">
+                · actual next step not in top 5
+              </span>
+            )}
+          </div>
+          <div className="text-tiny font-mono text-muted-foreground tabular">
+            top-1 {top1 ? (top1.prob * 100).toFixed(1) : "—"}%
+            {latency != null && ` · inference ${latency.toFixed(0)} ms`}
+          </div>
         </div>
       )}
     </div>
   );
 }
+
 
 /* ============================================================ */
 /* TAB · Complete                                               */
