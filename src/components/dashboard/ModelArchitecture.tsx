@@ -1,3 +1,4 @@
+import * as React from "react";
 import { motion } from "framer-motion";
 
 // ============================================================================
@@ -93,58 +94,209 @@ function StatRow() {
   );
 }
 
-// ----- LAYER BOX ----------------------------------------------------------
-function Box({
+// ----- SHAPE PRIMITIVES ---------------------------------------------------
+// Helper: fill a clipped shape with a colored "border" rim by stacking a
+// solid-color layer behind an inner tinted layer (CSS borders don't follow
+// clip-path).
+function ClippedShape({
+  clip,
+  width,
+  height,
   color,
-  name,
-  detail,
-  param,
-  badge,
-  short = false,
-  id,
+  children,
 }: {
+  clip: string;
+  width: string | number;
+  height: number;
   color: BoxColor;
-  name: string;
-  detail?: string;
-  param?: string;
-  badge?: string;
-  short?: boolean;
-  id?: string;
+  children: React.ReactNode;
 }) {
   const c = COLORS[color];
   return (
-    <div
-      id={id}
-      className="relative w-full rounded-md border border-border flex flex-col justify-center px-3"
-      style={{
-        height: short ? 36 : 52,
-        backgroundColor: tint(c, 9),
-        borderLeft: `3px solid ${c}`,
-      }}
-    >
-      <div className="flex items-center gap-2">
+    <div className="relative mx-auto" style={{ width, height }}>
+      <div
+        className="absolute inset-0"
+        style={{ clipPath: clip, backgroundColor: c }}
+      />
+      <div
+        className="absolute"
+        style={{
+          inset: 1.5,
+          clipPath: clip,
+          backgroundColor: `color-mix(in oklab, ${c} 14%, var(--card))`,
+        }}
+      />
+      <div className="relative w-full h-full flex flex-col items-center justify-center text-center px-8">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function BoxText({
+  name,
+  detail,
+  badge,
+  color,
+}: {
+  name: string;
+  detail?: string;
+  badge?: string;
+  color: BoxColor;
+}) {
+  const c = COLORS[color];
+  return (
+    <>
+      <div className="flex items-center gap-2 leading-none">
         <span className="font-mono text-xs font-semibold uppercase tracking-wide">
           {name}
         </span>
         {badge && (
           <span
-            className="font-mono text-[9px] px-1.5 py-px rounded-sm border"
-            style={{ color: c, borderColor: c, backgroundColor: tint(c, 12) }}
+            className="font-mono text-[9px] px-1.5 py-px rounded-sm"
+            style={{ color: c, backgroundColor: `color-mix(in oklab, ${c} 18%, var(--card))` }}
           >
             {badge}
           </span>
         )}
       </div>
       {detail && (
-        <div className="font-mono text-[10px] text-muted-foreground leading-tight mt-0.5">
+        <div className="font-mono text-[10px] text-muted-foreground leading-tight mt-1">
           {detail}
         </div>
       )}
-      {param && (
-        <div className="absolute top-1.5 right-2 font-mono text-[9px] text-muted-foreground">
-          {param}
-        </div>
-      )}
+    </>
+  );
+}
+
+function ParamChip({ value }: { value: string }) {
+  return (
+    <div className="mx-auto mt-0.5 font-mono text-[9px] text-muted-foreground tabular">
+      {value} params
+    </div>
+  );
+}
+
+// — Tokenizer: wide pill ----------------------------------------------------
+function PillBox({ name, detail, param }: { name: string; detail?: string; param?: string }) {
+  const c = COLORS.cyan;
+  return (
+    <>
+      <div
+        className="relative w-full rounded-full flex items-center justify-center gap-3 px-6"
+        style={{
+          height: 40,
+          backgroundColor: `color-mix(in oklab, ${c} 12%, var(--card))`,
+          border: `1.5px solid ${c}`,
+        }}
+      >
+        <span className="font-mono text-xs font-semibold uppercase tracking-wide">{name}</span>
+        {detail && (
+          <span className="font-mono text-[10px] text-muted-foreground">· {detail}</span>
+        )}
+      </div>
+      {param && <ParamChip value={param} />}
+    </>
+  );
+}
+
+// — Embedding / LM Head: trapezoids ----------------------------------------
+function TrapezoidBox({
+  direction,
+  color,
+  name,
+  detail,
+  badge,
+  param,
+}: {
+  direction: "down" | "up";
+  color: BoxColor;
+  name: string;
+  detail?: string;
+  badge?: string;
+  param?: string;
+}) {
+  const clip =
+    direction === "down"
+      ? "polygon(8% 0, 92% 0, 100% 100%, 0 100%)"
+      : "polygon(0 0, 100% 0, 92% 100%, 8% 100%)";
+  return (
+    <>
+      <ClippedShape clip={clip} width="88%" height={56} color={color}>
+        <BoxText name={name} detail={detail} badge={badge} color={color} />
+      </ClippedShape>
+      {param && <ParamChip value={param} />}
+    </>
+  );
+}
+
+// — Multi-Head Attention: tall hexagon -------------------------------------
+function HexBox({
+  color,
+  name,
+  detail,
+  param,
+}: {
+  color: BoxColor;
+  name: string;
+  detail?: string;
+  param?: string;
+}) {
+  const clip = "polygon(6% 0, 94% 0, 100% 50%, 94% 100%, 6% 100%, 0 50%)";
+  return (
+    <>
+      <ClippedShape clip={clip} width="100%" height={72} color={color}>
+        <BoxText name={name} detail={detail} color={color} />
+      </ClippedShape>
+      {param && <ParamChip value={param} />}
+    </>
+  );
+}
+
+// — SwiGLU FFN: bowtie / wide-middle hexagon -------------------------------
+function BowtieBox({
+  color,
+  name,
+  detail,
+  param,
+}: {
+  color: BoxColor;
+  name: string;
+  detail?: string;
+  param?: string;
+}) {
+  // Inverted points: narrow at sides, wide at middle (up→middle→down).
+  const clip =
+    "polygon(15% 0, 85% 0, 100% 30%, 100% 70%, 85% 100%, 15% 100%, 0 70%, 0 30%)";
+  return (
+    <>
+      <ClippedShape clip={clip} width="100%" height={76} color={color}>
+        <BoxText name={name} detail={detail} color={color} />
+      </ClippedShape>
+      {param && <ParamChip value={param} />}
+    </>
+  );
+}
+
+// — RMSNorm: thin bar with side label --------------------------------------
+function NormBar({ name }: { name: string }) {
+  const c = COLORS.green;
+  return (
+    <div className="flex items-center gap-3 mx-auto" style={{ width: "75%" }}>
+      <span
+        className="font-mono text-[10px] uppercase tracking-wide shrink-0"
+        style={{ color: c }}
+      >
+        {name}
+      </span>
+      <div
+        className="flex-1 rounded-sm"
+        style={{
+          height: 10,
+          backgroundColor: `color-mix(in oklab, ${c} 22%, var(--card))`,
+          border: `1px solid ${c}`,
+        }}
+      />
     </div>
   );
 }
@@ -169,14 +321,18 @@ function Arrow({ label }: { label?: string }) {
   );
 }
 
-// ----- RESIDUAL ADD CIRCLE ------------------------------------------------
+// ----- RESIDUAL ADD CIRCLE (on the center axis) ---------------------------
 function PlusAdd() {
   return (
     <div className="relative h-6 w-full flex justify-center items-center">
       <div className="w-px h-full bg-border-strong" />
       <div
-        className="absolute -left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 flex items-center justify-center font-mono text-xs bg-card"
-        style={{ borderColor: "var(--border-strong)", color: "var(--muted-foreground)" }}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full border flex items-center justify-center font-mono text-[11px] leading-none"
+        style={{
+          borderColor: "var(--border-strong)",
+          backgroundColor: "var(--card)",
+          color: "var(--muted-foreground)",
+        }}
       >
         ⊕
       </div>
@@ -197,8 +353,8 @@ function Top5Box() {
   const c = COLORS.green;
   return (
     <div
-      className="relative w-full rounded-md border border-border px-3 py-2"
-      style={{ backgroundColor: tint(c, 9), borderLeft: `3px solid ${c}` }}
+      className="relative w-full rounded-xl border-2 px-4 py-3"
+      style={{ backgroundColor: tint(c, 9), borderColor: c }}
     >
       <div className="font-mono text-xs font-semibold uppercase tracking-wide mb-1.5">
         Top-5 Predictions
@@ -330,21 +486,17 @@ export function ModelArchitecture() {
             backgroundColor: COLORS.cyan,
             boxShadow: `0 0 10px ${COLORS.cyan}`,
           }}
-          animate={{ y: [0, 760] }}
+          animate={{ y: [0, 820] }}
           transition={{ duration: 3.5, ease: "linear", repeat: Infinity }}
         />
 
         {/* Tokenizer */}
-        <Box
-          color="cyan"
-          name="Tokenizer"
-          detail="202-token vocab"
-          param="—"
-        />
+        <PillBox name="Tokenizer" detail="202-token vocab" />
         <Arrow label="string → ID · [B, T]" />
 
         {/* Token Embedding */}
-        <Box
+        <TrapezoidBox
+          direction="down"
           color="amber"
           name="Token Embedding"
           detail="202 × 512"
@@ -371,18 +523,18 @@ export function ModelArchitecture() {
             × 8
           </div>
 
-          <Box color="green" name="RMSNorm" short />
+          <NormBar name="RMSNorm" />
           <Arrow />
-          <Box
+          <HexBox
             color="orange"
             name="Multi-Head Attention"
             detail="8h · 64 · RoPE · Causal"
             param="1.05M"
           />
           <PlusAdd />
-          <Box color="green" name="RMSNorm" short />
+          <NormBar name="RMSNorm" />
           <Arrow />
-          <Box
+          <BowtieBox
             color="purple"
             name="SwiGLU FFN"
             detail="512 → 1368 → 512"
@@ -394,16 +546,16 @@ export function ModelArchitecture() {
         <Arrow label="[B, T, 512]" />
 
         {/* Final RMSNorm */}
-        <Box color="green" name="Final RMSNorm" short />
+        <NormBar name="Final RMSNorm" />
         <Arrow />
 
         {/* LM Head */}
-        <Box
+        <TrapezoidBox
+          direction="up"
           color="pink"
           name="LM Head"
           detail="512 → 202"
           badge="★ tied"
-          param="—"
         />
         <Arrow label="logits [B, T, 202]" />
 
