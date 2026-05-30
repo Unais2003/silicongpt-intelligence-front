@@ -2,7 +2,7 @@ import * as React from "react";
 import { motion } from "framer-motion";
 
 // ============================================================================
-// Horizontal visual model-architecture diagram (GPT/LLaMA-paper style)
+// Compact horizontal model-architecture diagram (fits ~1060px wide, no scroll)
 // ============================================================================
 
 const COLORS = {
@@ -23,7 +23,7 @@ function solidTint(hex: string, pct = 14) {
   return `color-mix(in oklab, ${hex} ${pct}%, var(--card))`;
 }
 
-// ----- INPUT TOKEN STRIP --------------------------------------------------
+// ----- INPUT TOKEN STRIP (vertical, sits left of Tokenizer) ---------------
 const INPUT_STEPS = [
   "RECEIVE WAFER LOT",
   "PRE CLEAN WAFER",
@@ -33,27 +33,23 @@ const INPUT_STEPS = [
   "THERMAL OXIDATION",
   "DEPOSIT POLYSILICON",
   "POLYSILICON ANNEAL",
-  "GATE LITHO",
-  "GATE ETCH",
-  "SD IMPLANT",
-  "RTA ANNEAL",
 ];
 const ACTIVE_IDX = 6;
 
-function InputStrip() {
+function InputStripVertical() {
   return (
-    <div>
-      <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-1.5">
-        Input Sequence
+    <div className="shrink-0" style={{ width: 116 }}>
+      <div className="font-mono text-[8px] uppercase tracking-widest text-muted-foreground mb-1">
+        Input Seq
       </div>
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div className="flex flex-col gap-[3px]">
         {INPUT_STEPS.map((s, i) => {
           const isActive = i === ACTIVE_IDX;
           const isPast = i < ACTIVE_IDX;
           return (
             <div
               key={s}
-              className="font-mono text-[10px] px-2 py-1 border whitespace-nowrap shrink-0"
+              className="font-mono text-[8.5px] px-1.5 py-[3px] border truncate"
               style={{
                 background: isActive ? COLORS.cyan : "var(--card)",
                 color: isActive ? "#fff" : "var(--foreground)",
@@ -113,13 +109,13 @@ function BoxText({
   const c = COLORS[color];
   return (
     <>
-      <div className="flex items-center gap-1.5 leading-none">
-        <span className="font-mono text-[11px] font-semibold uppercase tracking-wide">
+      <div className="flex items-center gap-1 leading-none">
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-tight">
           {name}
         </span>
         {badge && (
           <span
-            className="font-mono text-[8px] px-1 py-px rounded-sm"
+            className="font-mono text-[7.5px] px-1 py-px rounded-sm"
             style={{ color: c, backgroundColor: solidTint(c, 18) }}
           >
             {badge}
@@ -127,7 +123,7 @@ function BoxText({
         )}
       </div>
       {detail && (
-        <div className="font-mono text-[9px] text-muted-foreground leading-tight mt-1">
+        <div className="font-mono text-[8.5px] text-muted-foreground leading-tight mt-0.5">
           {detail}
         </div>
       )}
@@ -137,7 +133,7 @@ function BoxText({
 
 function ParamChip({ value }: { value: string }) {
   return (
-    <div className="mx-auto mt-1 font-mono text-[9px] text-muted-foreground tabular text-center">
+    <div className="mx-auto mt-0.5 font-mono text-[8.5px] text-muted-foreground tabular text-center">
       {value}
     </div>
   );
@@ -145,7 +141,7 @@ function ParamChip({ value }: { value: string }) {
 
 function withParam(node: React.ReactNode, param?: string, width: number | string = "auto") {
   return (
-    <div className="flex flex-col items-center" style={{ width }}>
+    <div className="flex flex-col items-center shrink-0" style={{ width }}>
       {node}
       {param && <ParamChip value={param} />}
     </div>
@@ -155,12 +151,13 @@ function withParam(node: React.ReactNode, param?: string, width: number | string
 // — Tokenizer: pill --------------------------------------------------------
 function PillBox({ name, detail }: { name: string; detail?: string }) {
   const c = COLORS.cyan;
+  const W = 88;
   return withParam(
     <div
-      className="rounded-full flex flex-col items-center justify-center px-3 text-center"
+      className="rounded-full flex flex-col items-center justify-center px-2 text-center"
       style={{
-        width: 130,
-        height: 70,
+        width: W,
+        height: 56,
         backgroundColor: solidTint(c, 12),
         border: `1.5px solid ${c}`,
       }}
@@ -168,11 +165,11 @@ function PillBox({ name, detail }: { name: string; detail?: string }) {
       <BoxText name={name} detail={detail} color="cyan" />
     </div>,
     undefined,
-    130,
+    W,
   );
 }
 
-// — Embedding / LM Head: trapezoid (house pointing right / left) -----------
+// — Embedding / LM Head: trapezoid -----------------------------------------
 function TrapezoidBox({
   direction,
   color,
@@ -193,8 +190,8 @@ function TrapezoidBox({
     direction === "right"
       ? "polygon(0 0, 75% 0, 100% 50%, 75% 100%, 0 100%)"
       : "polygon(25% 0, 100% 0, 100% 100%, 25% 100%, 0 50%)";
-  const W = 130;
-  const H = 80;
+  const W = 92;
+  const H = 64;
   return withParam(
     <div className="relative" style={{ width: W, height: H }}>
       <div className="absolute inset-0" style={{ clipPath: clip, backgroundColor: c }} />
@@ -209,8 +206,8 @@ function TrapezoidBox({
       <div
         className="relative w-full h-full flex flex-col items-center justify-center text-center"
         style={{
-          paddingLeft: direction === "left" ? 22 : 6,
-          paddingRight: direction === "right" ? 22 : 6,
+          paddingLeft: direction === "left" ? 18 : 4,
+          paddingRight: direction === "right" ? 18 : 4,
         }}
       >
         <BoxText name={name} detail={detail} badge={badge} color={color} />
@@ -234,10 +231,10 @@ function SquareBox({
   param?: string;
 }) {
   const c = COLORS[color];
-  const S = 120;
+  const S = 80;
   return withParam(
     <div
-      className="flex flex-col items-center justify-center text-center px-3"
+      className="flex flex-col items-center justify-center text-center px-1.5"
       style={{
         width: S,
         height: S,
@@ -265,11 +262,11 @@ function RectBox({
   param?: string;
 }) {
   const c = COLORS[color];
-  const W = 100;
-  const H = 120;
+  const W = 70;
+  const H = 88;
   return withParam(
     <div
-      className="flex flex-col items-center justify-center text-center px-2"
+      className="flex flex-col items-center justify-center text-center px-1.5"
       style={{
         width: W,
         height: H,
@@ -288,18 +285,18 @@ function RectBox({
 function NormBar({ name }: { name: string }) {
   const c = COLORS.green;
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div className="flex flex-col items-center gap-1 shrink-0">
       <div
         className="rounded-sm"
         style={{
-          width: 14,
-          height: 70,
+          width: 12,
+          height: 56,
           backgroundColor: solidTint(c, 22),
           border: `1px solid ${c}`,
         }}
       />
       <span
-        className="font-mono text-[9px] uppercase tracking-wide whitespace-nowrap"
+        className="font-mono text-[8px] uppercase tracking-tight whitespace-nowrap"
         style={{ color: c }}
       >
         {name}
@@ -309,9 +306,9 @@ function NormBar({ name }: { name: string }) {
 }
 
 // ----- HORIZONTAL ARROW ---------------------------------------------------
-function HArrow({ label, w = 28 }: { label?: string; w?: number }) {
+function HArrow({ label, w = 16 }: { label?: string; w?: number }) {
   return (
-    <div className="relative flex items-center shrink-0" style={{ width: w, height: 80 }}>
+    <div className="relative flex items-center shrink-0" style={{ width: w, height: 64 }}>
       <div className="absolute left-0 right-0 top-1/2 h-px bg-border-strong" />
       <div
         className="absolute font-mono text-[10px] text-muted-foreground -translate-y-1/2"
@@ -320,7 +317,7 @@ function HArrow({ label, w = 28 }: { label?: string; w?: number }) {
         ▶
       </div>
       {label && (
-        <div className="absolute left-1/2 -translate-x-1/2 -top-1 whitespace-nowrap font-mono text-[9px] text-muted-foreground bg-background px-1">
+        <div className="absolute left-1/2 -translate-x-1/2 -top-1 whitespace-nowrap font-mono text-[8.5px] text-muted-foreground bg-background px-1">
           {label}
         </div>
       )}
@@ -331,10 +328,10 @@ function HArrow({ label, w = 28 }: { label?: string; w?: number }) {
 // ----- RESIDUAL ⊕ ---------------------------------------------------------
 function PlusAdd() {
   return (
-    <div className="relative flex items-center justify-center shrink-0" style={{ width: 28, height: 80 }}>
+    <div className="relative flex items-center justify-center shrink-0" style={{ width: 18, height: 64 }}>
       <div className="absolute left-0 right-0 top-1/2 h-px bg-border-strong" />
       <div
-        className="relative w-5 h-5 rounded-full border flex items-center justify-center font-mono text-[11px] leading-none"
+        className="relative w-4 h-4 rounded-full border flex items-center justify-center font-mono text-[10px] leading-none"
         style={{
           borderColor: "var(--border-strong)",
           backgroundColor: "var(--card)",
@@ -360,18 +357,18 @@ function Top5Box() {
   const c = COLORS.green;
   return (
     <div
-      className="relative rounded-xl border-2 px-3 py-2 shrink-0"
-      style={{ width: 220, backgroundColor: tint(c, 9), borderColor: c }}
+      className="relative rounded-lg border-2 px-2 py-1.5 shrink-0"
+      style={{ width: 180, backgroundColor: tint(c, 9), borderColor: c }}
     >
-      <div className="font-mono text-[10px] font-semibold uppercase tracking-wide mb-1.5">
+      <div className="font-mono text-[9px] font-semibold uppercase tracking-wide mb-1">
         Top-5 Predictions
       </div>
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {TOP5.map((r, i) => (
-          <div key={r.step} className="flex items-center gap-1.5 font-mono text-[9px]">
+          <div key={r.step} className="flex items-center gap-1 font-mono text-[8.5px]">
             <span className="text-muted-foreground w-2">{i + 1}</span>
             <span
-              className="w-[88px] truncate"
+              className="w-[68px] truncate"
               style={{ color: r.top ? c : "var(--muted-foreground)" }}
             >
               {r.step}
@@ -442,8 +439,7 @@ function ParamBreakdown() {
 
 // ----- MAIN COMPONENT -----------------------------------------------------
 export function ModelArchitecture() {
-  // Diagram min width — keeps all blocks on a single row.
-  const DIAGRAM_W = 1260;
+  const DIAGRAM_W = 1060;
 
   return (
     <div className="w-full">
@@ -452,34 +448,28 @@ export function ModelArchitecture() {
         <StatRow />
       </div>
 
-      {/* Input strip */}
-      <div className="max-w-3xl mx-auto mb-8">
-        <InputStrip />
-      </div>
-
-      {/* Horizontal diagram (scrolls on narrow viewports) */}
+      {/* Compact horizontal diagram */}
       <div className="overflow-x-auto pb-2">
         <div
           className="relative mx-auto"
-          style={{ minWidth: DIAGRAM_W, paddingTop: 64, paddingBottom: 16 }}
+          style={{ minWidth: DIAGRAM_W, paddingTop: 52, paddingBottom: 12 }}
         >
           {/* Weight-tie arc on top */}
           <svg
             className="absolute pointer-events-none"
-            style={{ left: 0, top: 0, width: DIAGRAM_W, height: 60 }}
-            viewBox={`0 0 ${DIAGRAM_W} 60`}
+            style={{ left: 0, top: 0, width: DIAGRAM_W, height: 48 }}
+            viewBox={`0 0 ${DIAGRAM_W} 48`}
             fill="none"
           >
-            {/* Arc from above Token Embedding (~x=215) up and over to above LM Head (~x=985) */}
             <path
-              d={`M 215 56 Q ${DIAGRAM_W / 2} -30 985 56`}
+              d={`M 245 44 Q ${DIAGRAM_W / 2} -22 820 44`}
               stroke={COLORS.pink}
               strokeWidth="1.2"
               strokeDasharray="4 3"
             />
             <text
               x={DIAGRAM_W / 2}
-              y="14"
+              y="12"
               fontSize="10"
               fontFamily="ui-monospace, monospace"
               fill={COLORS.pink}
@@ -491,21 +481,24 @@ export function ModelArchitecture() {
 
           {/* Animated particle on center horizontal axis */}
           <motion.div
-            className="absolute w-3 h-3 rounded-full pointer-events-none z-20"
+            className="absolute w-2.5 h-2.5 rounded-full pointer-events-none z-20"
             style={{
-              top: 64 + 60, // center of 120px-tall row roughly
+              top: 52 + 44,
               left: 0,
               backgroundColor: COLORS.cyan,
-              boxShadow: `0 0 10px ${COLORS.cyan}`,
+              boxShadow: `0 0 8px ${COLORS.cyan}`,
             }}
             animate={{ x: [0, DIAGRAM_W - 12] }}
             transition={{ duration: 4, ease: "linear", repeat: Infinity }}
           />
 
-          {/* Row */}
-          <div className="flex items-center gap-2">
+          {/* Row: input strip → tokenizer → embedding → ×8 → norm → lm head → top-5 */}
+          <div className="flex items-center gap-1.5">
+            <InputStripVertical />
+            <HArrow w={14} />
+
             <PillBox name="Tokenizer" detail="202-vocab" />
-            <HArrow label="[B, T]" />
+            <HArrow label="[B, T]" w={20} />
 
             <TrapezoidBox
               direction="right"
@@ -515,14 +508,14 @@ export function ModelArchitecture() {
               badge="★ tied"
               param="0.10M"
             />
-            <HArrow label="[B, T, 512]" />
+            <HArrow label="[B, T, 512]" w={20} />
 
             {/* ×8 horizontal dashed bracket */}
             <div
-              className="relative flex items-center gap-2 rounded-lg"
+              className="relative flex items-center gap-1.5 rounded-lg shrink-0"
               style={{
                 border: `2px dashed var(--border-strong)`,
-                padding: "16px 12px 12px",
+                padding: "12px 8px 8px",
               }}
             >
               <div
@@ -533,28 +526,28 @@ export function ModelArchitecture() {
               </div>
 
               <NormBar name="RMSNorm" />
-              <HArrow w={20} />
+              <HArrow w={10} />
               <SquareBox
                 color="orange"
-                name="Multi-Head Attn"
+                name="MH Attn"
                 detail="8h · 64 · RoPE"
                 param="1.05M"
               />
               <PlusAdd />
               <NormBar name="RMSNorm" />
-              <HArrow w={20} />
+              <HArrow w={10} />
               <RectBox
                 color="purple"
-                name="SwiGLU FFN"
+                name="SwiGLU"
                 detail="512→1368→512"
                 param="2.09M"
               />
               <PlusAdd />
             </div>
 
-            <HArrow label="[B, T, 512]" />
+            <HArrow w={14} />
             <NormBar name="Final Norm" />
-            <HArrow />
+            <HArrow w={14} />
 
             <TrapezoidBox
               direction="left"
@@ -563,7 +556,7 @@ export function ModelArchitecture() {
               detail="512 → 202"
               badge="★ tied"
             />
-            <HArrow label="logits [B, T, 202]" />
+            <HArrow label="logits" w={20} />
 
             <Top5Box />
           </div>
@@ -571,7 +564,7 @@ export function ModelArchitecture() {
       </div>
 
       {/* Parameter breakdown */}
-      <div className="mt-8">
+      <div className="mt-6">
         <ParamBreakdown />
       </div>
     </div>
