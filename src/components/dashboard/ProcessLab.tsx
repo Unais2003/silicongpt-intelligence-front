@@ -495,46 +495,35 @@ function RecipeStrip({
 
   return (
     <div className="bg-surface border-b border-border">
-      <div
-        ref={stripRef}
-        className="overflow-x-auto px-4 pt-5 pb-3"
-      >
-        <div className="flex items-end gap-1.5 min-w-max">
+      <div ref={stripRef} className="px-4 pt-4 pb-3">
+        <div className="flex flex-wrap gap-[3px]">
           {steps.map((s, i) => {
             const isCursor = i === cursor;
             const isBefore = i < cursor;
             return (
-              <div key={`${s}-${i}`} className="relative flex flex-col items-center">
-                {isCursor && (
-                  <span className="absolute -top-4 text-tiny font-mono uppercase tracking-widest text-[var(--info)]">
-                    ▶ cursor
-                  </span>
-                )}
-                <button
-                  ref={isCursor ? activeRef : null}
-                  onClick={() => setCursor(i)}
-                  className={`font-mono text-xs px-2 py-1 border whitespace-nowrap transition-colors ${
-                    isCursor
-                      ? "bg-[var(--info)] text-white border-[var(--info)]"
-                      : isBefore
-                        ? "border-border bg-background text-muted-foreground hover:text-foreground"
-                        : "border-border bg-background text-foreground hover:bg-surface"
-                  }`}
-                >
-                  <span className="opacity-60 mr-1 tabular">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  {s}
-                </button>
-              </div>
+              <button
+                key={`${s}-${i}`}
+                ref={isCursor ? activeRef : null}
+                onClick={() => setCursor(i)}
+                title={`${String(i + 1).padStart(2, "0")} · ${s}`}
+                aria-label={`Step ${i + 1}: ${s}`}
+                className={`h-3 w-3 border transition-colors ${
+                  isCursor
+                    ? "bg-[var(--info)] border-[var(--info)] ring-1 ring-[var(--info)] ring-offset-1 ring-offset-surface"
+                    : isBefore
+                      ? "bg-foreground/40 border-foreground/40 hover:bg-foreground/70"
+                      : "bg-background border-border hover:bg-foreground/20"
+                }`}
+              />
             );
           })}
         </div>
       </div>
-      <div className="px-4 pb-2 text-tiny font-mono text-muted-foreground">
-        {dataset.family} · {dataset.id} · step {cursor + 1} of {steps.length} ·{" "}
-        {basename(health?.ckpt_path ?? "no checkpoint")} ·{" "}
-        <span className="text-foreground/70">{stageOf(steps[cursor] ?? "")}</span>
+      <div className="px-4 pb-2 text-tiny font-mono text-muted-foreground flex flex-wrap gap-x-2">
+        <span>{dataset.family} · {dataset.id} · step {cursor + 1} of {steps.length} · {basename(health?.ckpt_path ?? "no checkpoint")}</span>
+        <span className="text-foreground/70">
+          ▶ {String(cursor + 1).padStart(2, "0")} {steps[cursor] ?? "—"} · {stageOf(steps[cursor] ?? "")}
+        </span>
       </div>
     </div>
   );
