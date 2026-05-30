@@ -486,21 +486,17 @@ export function ModelArchitecture() {
             backgroundColor: COLORS.cyan,
             boxShadow: `0 0 10px ${COLORS.cyan}`,
           }}
-          animate={{ y: [0, 760] }}
+          animate={{ y: [0, 820] }}
           transition={{ duration: 3.5, ease: "linear", repeat: Infinity }}
         />
 
         {/* Tokenizer */}
-        <Box
-          color="cyan"
-          name="Tokenizer"
-          detail="202-token vocab"
-          param="—"
-        />
+        <PillBox name="Tokenizer" detail="202-token vocab" />
         <Arrow label="string → ID · [B, T]" />
 
         {/* Token Embedding */}
-        <Box
+        <TrapezoidBox
+          direction="down"
           color="amber"
           name="Token Embedding"
           detail="202 × 512"
@@ -527,18 +523,18 @@ export function ModelArchitecture() {
             × 8
           </div>
 
-          <Box color="green" name="RMSNorm" short />
+          <NormBar name="RMSNorm" />
           <Arrow />
-          <Box
+          <HexBox
             color="orange"
             name="Multi-Head Attention"
             detail="8h · 64 · RoPE · Causal"
             param="1.05M"
           />
           <PlusAdd />
-          <Box color="green" name="RMSNorm" short />
+          <NormBar name="RMSNorm" />
           <Arrow />
-          <Box
+          <BowtieBox
             color="purple"
             name="SwiGLU FFN"
             detail="512 → 1368 → 512"
@@ -550,16 +546,16 @@ export function ModelArchitecture() {
         <Arrow label="[B, T, 512]" />
 
         {/* Final RMSNorm */}
-        <Box color="green" name="Final RMSNorm" short />
+        <NormBar name="Final RMSNorm" />
         <Arrow />
 
         {/* LM Head */}
-        <Box
+        <TrapezoidBox
+          direction="up"
           color="pink"
           name="LM Head"
           detail="512 → 202"
           badge="★ tied"
-          param="—"
         />
         <Arrow label="logits [B, T, 202]" />
 
