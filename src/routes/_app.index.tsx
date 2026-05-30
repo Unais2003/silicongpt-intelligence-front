@@ -36,18 +36,12 @@ function Overview() {
           <SectionHeading
             kicker="§ 01 · Arena"
             title="Head-to-head against frontier LLMs."
-            desc="SiliconGPT — a 47M-parameter decoder trained from scratch — versus GPT-5, Claude 4.5, Gemini 2.5, and Kimi K2 on semiconductor process tasks."
+            desc="SiliconGPT — a 47M-parameter decoder trained from scratch — versus GPT-5, Claude 4.5, Gemini 2.5, and Kimi K2 on semiconductor process tasks. WaferBench v0.4 radar on the right."
           />
-          <ModelArena />
-        </section>
-
-        <section>
-          <SectionHeading
-            kicker="§ 02 · Benchmark"
-            title="WaferBench v0.4 radar."
-            desc="Domain accuracy, validity, OOD transfer, latency, and cost — measured across the full benchmark suite."
-          />
-          <BenchmarkArena />
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] gap-6 items-start">
+            <ModelArena />
+            <BenchmarkArena />
+          </div>
         </section>
       </div>
 
