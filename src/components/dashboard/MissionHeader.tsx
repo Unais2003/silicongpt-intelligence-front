@@ -3,8 +3,9 @@ import { StatusDot } from "./primitives";
 import logo from "@/assets/silicongpt-logo.png";
 
 function useClock() {
-  const [t, setT] = useState(() => new Date());
+  const [t, setT] = useState<Date | null>(null);
   useEffect(() => {
+    setT(new Date());
     const i = setInterval(() => setT(new Date()), 1000);
     return () => clearInterval(i);
   }, []);
