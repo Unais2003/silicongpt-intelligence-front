@@ -1,37 +1,27 @@
 import { Panel, StatusDot } from "./primitives";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 
-const TRAIN_FAMILIES = [
-  "CMOS-28nm", "FinFET-14nm", "DRAM-1Z", "NAND-128L", "BiCMOS",
-  "SOI-22nm", "GaN-HEMT", "MEMS-Pressure", "Image-Sensor", "Power-IGBT",
-  "RF-SiGe", "Photonics-SiN", "TSV-Stack", "eFlash-40nm",
-];
+const TRAIN_FAMILIES = ["mosfet", "igbt", "ic"];
 
 const HELDOUT = [
-  { name: "GAA-3nm", acc: 0.612 },
-  { name: "3D-NAND-232L", acc: 0.547 },
-  { name: "SiC-MOSFET", acc: 0.498 },
-  { name: "Spintronic-MRAM", acc: 0.441 },
-  { name: "Quantum-Cryo", acc: 0.395 },
-  { name: "Neuromorphic-RRAM", acc: 0.477 },
+  { name: "IC family (held out)", acc: 0.497 },
 ];
 
 const FOLDS = [
-  { fold: "Fold-A", inDist: 81.2, outDist: 51.4 },
-  { fold: "Fold-B", inDist: 80.4, outDist: 48.9 },
-  { fold: "Fold-C", inDist: 81.5, outDist: 48.2 },
+  { fold: "Train: mosfet+igbt", inDist: 81.5, outDist: 49.7 },
+  { fold: "Test: IC (OOD)",     inDist: 0,    outDist: 49.7 },
 ];
 
 export function OODDashboard() {
   return (
     <Panel
       title="Out-of-Distribution Generalization"
-      meta={<span className="flex items-center gap-2"><StatusDot color="info" /> 3-FOLD · held-out families</span>}
+      meta={<span className="flex items-center gap-2"><StatusDot color="info" /> IC HELD OUT · train on mosfet+igbt · test IC</span>}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div>
           <div className="text-tiny font-mono uppercase text-muted-foreground mb-2">
-            Training Distribution · 14 families
+            Training Families · 3 total
           </div>
           <div className="grid grid-cols-2 gap-px bg-border border border-border">
             {TRAIN_FAMILIES.map((f) => (
@@ -45,7 +35,7 @@ export function OODDashboard() {
 
         <div>
           <div className="text-tiny font-mono uppercase text-muted-foreground mb-2">
-            Held-out Families · zero examples seen
+            OOD Holdout · IC family · 4,000 sequences
           </div>
           <div className="border border-border">
             {HELDOUT.map((h, i) => (
@@ -67,15 +57,15 @@ export function OODDashboard() {
             ))}
           </div>
           <div className="mt-3 text-tiny font-mono text-muted-foreground leading-relaxed">
-            Mean OOD accuracy <span className="text-foreground">49.5%</span> · upper bound by
-            random baseline <span className="text-foreground">7.1%</span>. Model recovers learned
-            process grammar even on unseen device families.
+            OOD next-step top-1 <span className="text-foreground">~49.7%</span> · random baseline
+            <span className="text-foreground"> 0.5%</span> (1/202 tokens). No family label given to
+            the model — must generalize from sequence structure alone.
           </div>
         </div>
 
         <div>
           <div className="text-tiny font-mono uppercase text-muted-foreground mb-2">
-            3-Fold Cross-Family Evaluation
+            Cross-Family Evaluation
           </div>
           <div className="border border-border p-2 h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
