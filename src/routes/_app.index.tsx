@@ -3,7 +3,6 @@ import { MissionHeader } from "@/components/dashboard/MissionHeader";
 import { LiveMetrics } from "@/components/dashboard/LiveMetrics";
 import { ModelArena } from "@/components/dashboard/ModelArena";
 import { BenchmarkArena } from "@/components/dashboard/BenchmarkArena";
-import { ResearchFindings } from "@/components/dashboard/ResearchFindings";
 import { SectionHeading, PageFooter } from "@/components/dashboard/layout";
 
 export const Route = createFileRoute("/_app/")({
@@ -49,15 +48,6 @@ function Overview() {
             desc="Domain accuracy, validity, OOD transfer, latency, and cost — measured across the full benchmark suite."
           />
           <BenchmarkArena />
-        </section>
-
-        <section>
-          <SectionHeading
-            kicker="§ 03 · Research"
-            title="Key findings."
-            desc="Four results from the v0.4 cycle. Description-initialization is the single largest lever for OOD."
-          />
-          <ResearchFindings />
         </section>
       </div>
 
