@@ -3,7 +3,6 @@ import { Panel, StatusDot } from "./primitives";
 import { ModelLogo } from "./ModelLogo";
 
 type Row = {
-  rank: number;
   name: string;
   org: string;
   top1: number;
@@ -17,7 +16,6 @@ type Row = {
 
 const MODELS: Row[] = [
   {
-    rank: 1,
     name: "SiliconGPT",
     org: "ours · 25.31M",
     top1: 80.7,
@@ -29,7 +27,6 @@ const MODELS: Row[] = [
     us: true,
   },
   {
-    rank: 2,
     name: "N-gram (trigram)",
     org: "baseline · no params",
     top1: 76.1,
@@ -40,7 +37,6 @@ const MODELS: Row[] = [
     latency: 1,
   },
   {
-    rank: 3,
     name: "Gemini 3.5-flash",
     org: "Google · API",
     top1: 44.0,
@@ -49,39 +45,6 @@ const MODELS: Row[] = [
     completion: 6.5,
     anomalyF1: 0.842,
     latency: 2800,
-  },
-  {
-    rank: 4,
-    name: "GPT-5",
-    org: "OpenAI · API",
-    top1: 0,
-    top5: 0,
-    ood: null,
-    completion: 0,
-    anomalyF1: null,
-    latency: 0,
-  },
-  {
-    rank: 5,
-    name: "Qwen3.6-35B-A3B",
-    org: "Alibaba · open weights",
-    top1: 0,
-    top5: 0,
-    ood: null,
-    completion: 0,
-    anomalyF1: null,
-    latency: 0,
-  },
-  {
-    rank: 6,
-    name: "DeepSeek V3-0324",
-    org: "DeepSeek · open weights",
-    top1: 0,
-    top5: 0,
-    ood: null,
-    completion: 0,
-    anomalyF1: null,
-    latency: 0,
   },
 ];
 
