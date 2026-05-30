@@ -31,7 +31,7 @@ type Stage = {
   desc: string;
   stat: string;
   io: { in: string; out: string };
-  visual: (props: { className?: string }) => JSX.Element;
+  visual: (props: { className?: string }) => React.ReactElement;
 };
 
 const V = {
