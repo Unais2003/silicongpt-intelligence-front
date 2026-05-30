@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Panel, StatusDot, Label } from "./primitives";
+import { StatusDot } from "./primitives";
 import {
   api,
   type AnomalyEval,
@@ -183,60 +183,114 @@ const PROCESS_STAGE: Record<string, string> = {
 };
 
 function stageOf(step: string): string {
-  // Tokens are space-separated; fall back to underscore for legacy / OOD.
   const head = step.split(/[\s_]/)[0];
   return PROCESS_STAGE[head] ?? PROCESS_STAGE[step] ?? "Process";
 }
 
-// Normalize a raw user-pasted token: trim, collapse whitespace, uppercase.
-// Spaces inside the token are PRESERVED — the backend vocab uses them.
 function normalizeToken(raw: string): string {
   return raw.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
+function parseTokens(text: string): string[] {
+  return text
+    .split(/[\r\n,;|]+/)
+    .map(normalizeToken)
+    .filter((s) => s && !s.startsWith("#"));
+}
+
+function basename(p: string | null | undefined): string {
+  if (!p) return "—";
+  const parts = p.split(/[\\/]/);
+  return parts[parts.length - 1] || p;
+}
+
 /* ============================================================ */
-/* Step 1 — Import Data                                         */
+/* Modal shell                                                  */
 /* ============================================================ */
 
-type ImportMode = "demo" | "paste" | "upload" | "random";
+function Modal({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 8, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        className="bg-card border border-border-strong w-full max-w-sm mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-surface">
+          <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+            {title}
+          </span>
+          <button
+            onClick={onClose}
+            className="font-mono text-xs text-muted-foreground hover:text-foreground"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="p-4">{children}</div>
+      </motion.div>
+    </div>
+  );
+}
 
-function ImportPanel({
+/* ============================================================ */
+/* Import Toolbar                                               */
+/* ============================================================ */
+
+function ImportToolbar({
   dataset,
   setDataset,
   setSteps,
+  setCursor,
 }: {
   dataset: Dataset;
   setDataset: (d: Dataset) => void;
   setSteps: (s: string[]) => void;
+  setCursor: (n: number) => void;
 }) {
-  const [mode, setMode] = useState<ImportMode>("demo");
-  const [paste, setPaste] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [randomOpen, setRandomOpen] = useState(false);
+  const [paste, setPaste] = useState("");
 
-  // Random mode state
+  // random modal state
   const [temperature, setTemperature] = useState(0.9);
   const [randPrefix, setRandPrefix] = useState("");
   const [randLoading, setRandLoading] = useState(false);
   const [randError, setRandError] = useState<string | null>(null);
 
-  const parseTokens = (text: string) =>
-    text
-      .split(/[\r\n,;|]+/)
-      .map(normalizeToken)
-      .filter((s) => s && !s.startsWith("#"));
+  const loadDataset = (d: Dataset) => {
+    setDataset(d);
+    setSteps(d.steps);
+    setCursor(0);
+  };
 
   const loadPaste = () => {
     const tokens = parseTokens(paste);
-    if (tokens.length) {
-      setDataset({
-        id: "CUSTOM",
-        family: "User Recipe",
-        node: "—",
-        description: `${tokens.length}-step custom sequence`,
-        steps: tokens,
-      });
-      setSteps(tokens);
-    }
+    if (!tokens.length) return;
+    loadDataset({
+      id: "CUSTOM",
+      family: "User Recipe",
+      node: "—",
+      description: `${tokens.length}-step custom sequence`,
+      steps: tokens,
+    });
+    setPasteOpen(false);
   };
 
   const onFile = (f: File | null) => {
@@ -245,16 +299,14 @@ function ImportPanel({
     reader.onload = () => {
       const text = String(reader.result ?? "");
       const tokens = parseTokens(text);
-      if (tokens.length) {
-        setDataset({
-          id: "CSV",
-          family: f.name,
-          node: `${(f.size / 1024).toFixed(1)} KB`,
-          description: `${tokens.length}-step recipe imported from CSV`,
-          steps: tokens,
-        });
-        setSteps(tokens);
-      }
+      if (!tokens.length) return;
+      loadDataset({
+        id: "CSV",
+        family: f.name,
+        node: `${(f.size / 1024).toFixed(1)} KB`,
+        description: `${tokens.length}-step recipe imported from CSV`,
+        steps: tokens,
+      });
     };
     reader.readAsText(f);
   };
@@ -265,16 +317,16 @@ function ImportPanel({
     try {
       const prefix = randPrefix ? parseTokens(randPrefix) : [];
       const r = await api.generate({ prefix, temperature });
-      setDataset({
+      loadDataset({
         id: "RANDOM",
         family: "Model Sample",
         node: `T=${temperature.toFixed(2)}`,
-        description: `${r.full.length}-step random sample · ${
+        description: `${r.full.length}-step sample · ${
           r.is_valid ? "VALID" : "INVALID"
         }`,
         steps: r.full,
       });
-      setSteps(r.full);
+      setRandomOpen(false);
     } catch (e) {
       setRandError(String(e));
     } finally {
@@ -282,291 +334,242 @@ function ImportPanel({
     }
   };
 
+  const presets = Object.values(DATASETS);
+
   return (
-    <Panel
-      title="Step 01 · Import Data"
-      meta={
-        <span className="flex items-center gap-2">
-          <StatusDot color="info" /> source: {dataset.id}
-        </span>
-      }
-    >
-      <div className="grid grid-cols-4 border border-border mb-4">
-        {(["demo", "paste", "upload", "random"] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={`px-2 py-2 font-mono text-tiny uppercase tracking-widest border-r border-border last:border-r-0 ${
-              mode === m
-                ? "bg-foreground text-background"
-                : "bg-card hover:bg-surface"
-            }`}
-          >
-            {m === "demo"
-              ? "Demo"
-              : m === "paste"
-                ? "Paste"
-                : m === "upload"
-                  ? "CSV"
-                  : "Random"}
-          </button>
-        ))}
+    <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-border bg-card">
+      <div className="flex items-center gap-1">
+        {presets.map((d) => {
+          const active = d.id === dataset.id;
+          return (
+            <button
+              key={d.id}
+              onClick={() => loadDataset(d)}
+              className={`px-2.5 py-1 font-mono text-tiny uppercase tracking-widest border ${
+                active
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-card border-border hover:bg-surface"
+              }`}
+            >
+              {d.id}
+            </button>
+          );
+        })}
       </div>
 
-      {mode === "demo" && (
-        <div className="grid grid-cols-2 gap-2">
-          {Object.values(DATASETS).map((d) => {
-            const active = d.id === dataset.id;
-            return (
-              <button
-                key={d.id}
-                onClick={() => {
-                  setDataset(d);
-                  setSteps(d.steps);
-                }}
-                className={`text-left border p-3 transition-colors ${
-                  active
-                    ? "border-[var(--info)] bg-accent"
-                    : "border-border bg-card hover:bg-surface"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs font-semibold">{d.id}</span>
-                  <span className="text-tiny font-mono text-muted-foreground tabular">
-                    {d.steps.length} steps
-                  </span>
-                </div>
-                <div className="mt-1 text-tiny font-mono text-muted-foreground">
-                  {d.family}
-                </div>
-                <div className="text-tiny font-mono text-muted-foreground">
-                  {d.node}
-                </div>
-                {d.id === "OOD" && (
-                  <div className="mt-2 text-tiny font-mono text-[var(--warning)]">
-                    ⚠ demo only — most tokens not in trained vocab
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <span className="h-5 w-px bg-border mx-1" />
 
-      {mode === "paste" && (
-        <div className="space-y-2">
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setPasteOpen(true)}
+          className="px-2.5 py-1 font-mono text-tiny uppercase tracking-widest border border-border bg-card hover:bg-surface"
+        >
+          ✎ Paste
+        </button>
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="px-2.5 py-1 font-mono text-tiny uppercase tracking-widest border border-border bg-card hover:bg-surface"
+        >
+          ↑ Upload
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv,.txt"
+          onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+          className="hidden"
+        />
+        <button
+          onClick={() => setRandomOpen(true)}
+          className="px-2.5 py-1 font-mono text-tiny uppercase tracking-widest border border-border bg-card hover:bg-surface"
+        >
+          ⚄ Random
+        </button>
+      </div>
+
+      <Modal
+        open={pasteOpen}
+        onClose={() => setPasteOpen(false)}
+        title="Paste Recipe"
+      >
+        <textarea
+          value={paste}
+          onChange={(e) => setPaste(e.target.value)}
+          rows={8}
+          placeholder={"RECEIVE WAFER\nRCA CLEAN\nGROW THERMAL OXIDE\n…"}
+          className="w-full bg-background border border-border p-2 font-mono text-xs"
+        />
+        <div className="mt-2 text-tiny font-mono text-muted-foreground">
+          Accepts newline, comma, semicolon, or `|` separators.
+        </div>
+        <button
+          onClick={loadPaste}
+          className="mt-3 w-full bg-foreground text-background font-mono text-xs uppercase tracking-widest py-2 hover:bg-[var(--info)]"
+        >
+          ▶ Load
+        </button>
+      </Modal>
+
+      <Modal
+        open={randomOpen}
+        onClose={() => setRandomOpen(false)}
+        title="Sample Recipe"
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+            Temperature
+          </span>
+          <span className="font-mono text-xs tabular">
+            {temperature.toFixed(2)}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0.4}
+          max={1.4}
+          step={0.05}
+          value={temperature}
+          onChange={(e) => setTemperature(parseFloat(e.target.value))}
+          className="w-full mt-1"
+        />
+        <div className="flex justify-between text-tiny font-mono text-muted-foreground mt-0.5">
+          <span>0.40 · sharp</span>
+          <span>1.40 · creative</span>
+        </div>
+        <div className="mt-3">
+          <div className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+            Prefix (optional)
+          </div>
           <textarea
-            value={paste}
-            onChange={(e) => setPaste(e.target.value)}
-            rows={6}
-            placeholder={"RECEIVE WAFER\nRCA CLEAN\nGROW THERMAL OXIDE\n…"}
-            className="w-full bg-background border border-border p-2 font-mono text-xs"
+            value={randPrefix}
+            onChange={(e) => setRandPrefix(e.target.value)}
+            rows={3}
+            placeholder={"RECEIVE WAFER\nRCA CLEAN"}
+            className="mt-1 w-full bg-background border border-border p-2 font-mono text-xs"
           />
-          <button
-            onClick={loadPaste}
-            className="w-full bg-foreground text-background font-mono text-xs uppercase tracking-widest py-2 hover:bg-[var(--info)]"
-          >
-            ▶ Load Sequence
-          </button>
         </div>
-      )}
-
-      {mode === "upload" && (
-        <div className="space-y-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv,.txt"
-            onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-            className="hidden"
-          />
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="w-full border border-dashed border-border-strong bg-card hover:bg-surface py-8 font-mono text-xs uppercase tracking-widest"
-          >
-            ⬆ Drop CSV / TXT · one step per line
-          </button>
-          <div className="text-tiny font-mono text-muted-foreground">
-            Accepts comma, newline, semicolon, or `|` separators.
+        <button
+          onClick={sampleRandom}
+          disabled={randLoading}
+          className="mt-3 w-full bg-foreground text-background font-mono text-xs uppercase tracking-widest py-2 hover:bg-[var(--info)] disabled:opacity-50"
+        >
+          {randLoading ? "● Sampling…" : "▶ Sample"}
+        </button>
+        {randError && (
+          <div className="mt-2 text-tiny font-mono text-destructive break-words">
+            {randError}
           </div>
-        </div>
-      )}
-
-      {mode === "random" && (
-        <div className="space-y-3">
-          <div>
-            <div className="flex items-center justify-between">
-              <Label>Temperature</Label>
-              <span className="font-mono text-xs tabular">
-                {temperature.toFixed(2)}
-              </span>
-            </div>
-            <input
-              type="range"
-              min={0.4}
-              max={1.4}
-              step={0.05}
-              value={temperature}
-              onChange={(e) => setTemperature(parseFloat(e.target.value))}
-              className="w-full mt-1"
-            />
-            <div className="flex justify-between text-tiny font-mono text-muted-foreground mt-0.5">
-              <span>0.40 · sharp</span>
-              <span>1.40 · creative</span>
-            </div>
-          </div>
-          <div>
-            <Label>Starting prefix (optional)</Label>
-            <textarea
-              value={randPrefix}
-              onChange={(e) => setRandPrefix(e.target.value)}
-              rows={3}
-              placeholder={"RECEIVE WAFER\nRCA CLEAN"}
-              className="mt-1 w-full bg-background border border-border p-2 font-mono text-xs"
-            />
-          </div>
-          <button
-            onClick={sampleRandom}
-            disabled={randLoading}
-            className="w-full bg-foreground text-background font-mono text-xs uppercase tracking-widest py-2 hover:bg-[var(--info)] disabled:opacity-50"
-          >
-            {randLoading ? "● Sampling…" : "▶ Sample New Recipe"}
-          </button>
-          {randError && (
-            <div className="text-tiny font-mono text-destructive break-words">
-              {randError}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="mt-4 pt-3 border-t border-border">
-        <Label>Active Recipe</Label>
-        <div className="mt-1 font-mono text-xs">{dataset.family}</div>
-        <div className="text-tiny font-mono text-muted-foreground">
-          {dataset.description}
-        </div>
-      </div>
-    </Panel>
+        )}
+      </Modal>
+    </div>
   );
 }
 
 /* ============================================================ */
-/* Step 2 — Sequence Explorer                                   */
+/* Recipe Chip Strip                                            */
 /* ============================================================ */
 
-function SequenceExplorer({
+function RecipeStrip({
   steps,
-  selected,
-  setSelected,
+  cursor,
+  setCursor,
+  dataset,
+  health,
 }: {
   steps: string[];
-  selected: number;
-  setSelected: (i: number) => void;
+  cursor: number;
+  setCursor: (n: number) => void;
+  dataset: Dataset;
+  health: Health | null;
 }) {
+  const stripRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [cursor]);
+
   return (
-    <Panel
-      title="Step 02 · Sequence Explorer"
-      meta={
-        <span className="flex items-center gap-2">
-          <StatusDot color="success" />
-          {steps.length} steps · cursor @{" "}
-          {String(selected + 1).padStart(2, "0")}
-        </span>
-      }
-    >
-      <div className="max-h-[520px] overflow-auto pr-1">
-        <div className="relative pl-6">
-          <div className="absolute left-[10px] top-1 bottom-1 w-px bg-border-strong" />
+    <div className="bg-surface border-b border-border">
+      <div
+        ref={stripRef}
+        className="overflow-x-auto px-4 pt-5 pb-3"
+      >
+        <div className="flex items-end gap-1.5 min-w-max">
           {steps.map((s, i) => {
-            const active = i === selected;
+            const isCursor = i === cursor;
+            const isBefore = i < cursor;
             return (
-              <button
-                key={`${s}-${i}`}
-                onClick={() => setSelected(i)}
-                className="block w-full text-left relative py-2"
-              >
-                <div
-                  className={`absolute -left-[1px] top-1/2 -translate-y-1/2 h-3 w-3 border ${
-                    active
-                      ? "bg-[var(--info)] border-[var(--info)]"
-                      : "bg-card border-border-strong"
-                  }`}
-                />
-                <div
-                  className={`grid grid-cols-[40px_1fr_120px] gap-2 items-center pl-3 py-1.5 border ${
-                    active
-                      ? "border-[var(--info)] bg-accent"
-                      : "border-transparent hover:bg-surface"
+              <div key={`${s}-${i}`} className="relative flex flex-col items-center">
+                {isCursor && (
+                  <span className="absolute -top-4 text-tiny font-mono uppercase tracking-widest text-[var(--info)]">
+                    ▶ cursor
+                  </span>
+                )}
+                <button
+                  ref={isCursor ? activeRef : null}
+                  onClick={() => setCursor(i)}
+                  className={`font-mono text-xs px-2 py-1 border whitespace-nowrap transition-colors ${
+                    isCursor
+                      ? "bg-[var(--info)] text-white border-[var(--info)]"
+                      : isBefore
+                        ? "border-border bg-background text-muted-foreground hover:text-foreground"
+                        : "border-border bg-background text-foreground hover:bg-surface"
                   }`}
                 >
-                  <span className="font-mono text-tiny text-muted-foreground tabular">
+                  <span className="opacity-60 mr-1 tabular">
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                  <span
-                    className={`font-mono text-xs ${active ? "text-foreground" : ""}`}
-                  >
-                    {s}
-                  </span>
-                  <span className="text-right text-tiny font-mono uppercase tracking-widest text-muted-foreground">
-                    {stageOf(s)}
-                  </span>
-                </div>
-              </button>
+                  {s}
+                </button>
+              </div>
             );
           })}
         </div>
       </div>
-    </Panel>
+      <div className="px-4 pb-2 text-tiny font-mono text-muted-foreground">
+        {dataset.family} · {dataset.id} · step {cursor + 1} of {steps.length} ·{" "}
+        {basename(health?.ckpt_path ?? "no checkpoint")} ·{" "}
+        <span className="text-foreground/70">{stageOf(steps[cursor] ?? "")}</span>
+      </div>
+    </div>
   );
 }
 
 /* ============================================================ */
-/* Step 3 — Task Tabs                                           */
+/* Tabs                                                         */
 /* ============================================================ */
 
-type TabId =
-  | "predict"
-  | "complete"
-  | "validate"
-  | "anomaly"
-  | "ood"
-  | "batch";
+type TabId = "predict" | "complete" | "validate" | "anomaly" | "batch";
 
-const TABS: { id: TabId; code: string; label: string }[] = [
-  { id: "predict", code: "T1", label: "Predict Next Step" },
-  { id: "complete", code: "T2", label: "Complete Sequence" },
-  { id: "validate", code: "T3", label: "Validate Process" },
-  { id: "anomaly", code: "T4", label: "Detect Anomalies" },
-  { id: "ood", code: "T5", label: "OOD Analysis" },
-  { id: "batch", code: "T6", label: "Batch Eval (CSV)" },
+const TABS: { id: TabId; label: string }[] = [
+  { id: "predict", label: "Next Step" },
+  { id: "complete", label: "Complete" },
+  { id: "validate", label: "Validate" },
+  { id: "anomaly", label: "Anomaly" },
+  { id: "batch", label: "Batch Eval" },
 ];
 
 function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 border-y border-border-strong">
+    <div className="flex border-b border-border-strong bg-card overflow-x-auto">
       {TABS.map((t) => {
         const active = tab === t.id;
         return (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`relative text-left px-4 py-3 border-r border-border last:border-r-0 ${
-              active ? "bg-accent" : "bg-card hover:bg-surface"
+            className={`relative px-4 py-2.5 font-mono text-tiny uppercase tracking-widest whitespace-nowrap ${
+              active
+                ? "text-[var(--info)]"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <div className="flex items-center gap-2">
-              <span className="text-tiny font-mono text-muted-foreground">
-                {t.code}
-              </span>
-              <span
-                className={`text-tiny font-mono uppercase tracking-widest ${
-                  active ? "text-[var(--info)]" : "text-foreground"
-                }`}
-              >
-                {t.label}
-              </span>
-            </div>
+            {t.label}
             {active && (
               <motion.div
                 layoutId="processlab-tab-underline"
@@ -581,15 +584,13 @@ function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
 }
 
 /* ============================================================ */
-/* TAB 1 · Predict Next Step                                    */
+/* TAB · Next Step                                              */
 /* ============================================================ */
 
 function PredictTab({
-  dataset,
   steps,
   cursor,
 }: {
-  dataset: Dataset;
   steps: string[];
   cursor: number;
 }) {
@@ -624,120 +625,78 @@ function PredictTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, steps.join("|")]);
 
-  const trueNext = dataset.steps[cursor + 1] ?? null;
+  const trueNext = steps[cursor + 1] ?? null;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-      <div className="lg:col-span-2 space-y-3">
-        <Panel title="Current Context">
-          <Label>Cursor</Label>
-          <div className="mt-1 font-mono text-xs">
-            step {String(cursor + 1).padStart(2, "0")} / {steps.length}
-          </div>
-          <div className="mt-3">
-            <Label>Last 4 Tokens</Label>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {prefix.slice(-4).map((t, i) => (
-                <span
-                  key={i}
-                  className="font-mono text-xs px-2 py-1 bg-card border border-border-strong"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-border grid grid-cols-2 gap-3 font-mono text-xs">
-            <div>
-              <Label>Family</Label>
-              <div className="mt-0.5">{dataset.family}</div>
-            </div>
-            <div>
-              <Label>Node</Label>
-              <div className="mt-0.5">{dataset.node}</div>
-            </div>
-          </div>
-        </Panel>
+    <div className="space-y-4">
+      <div className="text-tiny font-mono text-muted-foreground">
+        Predicting after step {cursor + 1}:{" "}
+        <span className="text-foreground">{steps[cursor] ?? "—"}</span>
       </div>
 
-      <div className="lg:col-span-3">
-        <Panel
-          title="Top-5 Predicted Steps"
-          meta={
-            error
-              ? "ERROR"
-              : running
-                ? "computing"
-                : latency != null
-                  ? `READY · ${latency.toFixed(0)} ms`
-                  : "READY"
-          }
-        >
-          <div className="space-y-2 min-h-[260px]">
-            {error && (
-              <div className="text-tiny font-mono text-destructive break-words">
-                backend error · {error}
-              </div>
-            )}
-            {!error && results.length === 0 && (
-              <div className="text-tiny font-mono text-muted-foreground pulse-dot">
-                sampling distribution…
-              </div>
-            )}
-            {results.map((r, i) => {
-              const isTrue = trueNext && r.token === trueNext;
-              return (
-                <motion.div
-                  key={`${r.token}-${i}`}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.06 }}
-                  className="grid grid-cols-12 items-center gap-3"
-                >
-                  <div className="col-span-1 font-mono text-tiny text-muted-foreground">
-                    #{i + 1}
-                  </div>
-                  <div
-                    className={`col-span-4 font-mono text-xs ${
-                      isTrue ? "text-[var(--success)] font-semibold" : ""
-                    }`}
-                  >
-                    {r.token}
-                    {isTrue && (
-                      <span className="ml-1 text-tiny text-[var(--success)]">
-                        ✓
-                      </span>
-                    )}
-                  </div>
-                  <div className="col-span-5 h-6 bg-background border border-border relative overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${r.prob * 100}%` }}
-                      transition={{
-                        duration: 0.6,
-                        delay: i * 0.06,
-                        ease: "easeOut",
-                      }}
-                      className={`h-full ${
-                        i === 0 ? "bg-[var(--info)]" : "bg-[var(--info)]/40"
-                      }`}
-                    />
-                  </div>
-                  <div className="col-span-2 text-right font-mono text-xs tabular">
-                    {(r.prob * 100).toFixed(1)}%
-                  </div>
-                </motion.div>
-              );
-            })}
+      <div className="space-y-2">
+        {error && (
+          <div className="text-xs font-mono text-destructive break-words">
+            backend error · {error}
           </div>
-        </Panel>
+        )}
+        {!error && running && results.length === 0 && (
+          <>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="h-6 bg-surface animate-pulse"
+                style={{ opacity: 1 - i * 0.15 }}
+              />
+            ))}
+          </>
+        )}
+        {results.map((r, i) => {
+          const isTrue = trueNext && r.token === trueNext;
+          return (
+            <motion.div
+              key={`${r.token}-${i}`}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.06 }}
+              className="flex items-center gap-3"
+            >
+              <span className="w-4 font-mono text-tiny text-muted-foreground tabular">
+                {i + 1}
+              </span>
+              <span className="flex-1 font-mono text-sm flex items-center gap-2">
+                {r.token}
+                {isTrue && (
+                  <span className="text-[var(--success)] text-tiny">✓</span>
+                )}
+              </span>
+              <div className="w-48 bg-surface h-1.5 overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${r.prob * 100}%` }}
+                  transition={{ duration: 0.6, delay: i * 0.06, ease: "easeOut" }}
+                  className="h-full bg-[var(--info)]"
+                />
+              </div>
+              <span className="w-12 text-right font-mono text-xs tabular">
+                {(r.prob * 100).toFixed(1)}%
+              </span>
+            </motion.div>
+          );
+        })}
       </div>
+
+      {latency != null && !running && (
+        <div className="text-tiny font-mono text-muted-foreground">
+          {latency.toFixed(0)}ms
+        </div>
+      )}
     </div>
   );
 }
 
 /* ============================================================ */
-/* TAB 2 · Complete Sequence                                    */
+/* TAB · Complete                                               */
 /* ============================================================ */
 
 function CompleteTab({
@@ -801,112 +760,77 @@ function CompleteTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, dataset.id, steps.join("|")]);
 
-  const all = [...prefix, ...out];
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-      <div className="lg:col-span-2">
-        <Panel title="Prefix · Locked">
-          <div className="space-y-1 max-h-[420px] overflow-auto">
-            {prefix.map((t, i) => (
-              <div
-                key={i}
-                className="grid grid-cols-[32px_1fr] gap-2 items-center font-mono text-xs"
-              >
-                <span className="text-muted-foreground tabular">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span>{t}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 flex gap-2">
-            <button
-              onClick={run}
-              disabled={running}
-              className="flex-1 bg-foreground text-background font-mono text-xs uppercase tracking-widest py-2 hover:bg-[var(--info)] disabled:opacity-50"
-            >
-              {running ? "● Streaming…" : "▶ Generate"}
-            </button>
-            <button
-              onClick={stop}
-              disabled={!running}
-              className="px-3 bg-card border border-border font-mono text-xs uppercase disabled:opacity-50"
-            >
-              ■
-            </button>
-          </div>
-          {latency != null && !running && !error && (
-            <div className="mt-2 text-tiny font-mono text-muted-foreground">
-              backend · {latency.toFixed(0)} ms · {out.length} tokens
-            </div>
-          )}
-          {error && (
-            <div className="mt-2 text-tiny font-mono text-destructive break-words">
-              {error}
-            </div>
-          )}
-        </Panel>
+    <div className="space-y-4">
+      <div className="text-tiny font-mono text-muted-foreground">
+        Completing {prefix.length}-step prefix → generating up to 220 steps
       </div>
 
-      <div className="lg:col-span-3">
-        <Panel
-          title="Predicted Pipeline"
-          meta={running ? "streaming" : `${out.length} generated`}
+      <div className="overflow-x-auto">
+        <div className="flex items-center gap-1.5 min-w-max pb-1">
+          {prefix.map((tok, i) => (
+            <span
+              key={`p-${i}`}
+              className="font-mono text-xs px-2 py-1 border border-border bg-background text-muted-foreground whitespace-nowrap"
+            >
+              <span className="opacity-60 mr-1 tabular">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              {tok}
+            </span>
+          ))}
+          <span className="h-6 border-r border-border-strong mx-1" />
+          {out.map((tok, i) => (
+            <motion.span
+              key={`g-${i}`}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="font-mono text-xs px-2 py-1 border border-[var(--info)] bg-[var(--info)] text-white whitespace-nowrap"
+            >
+              {tok}
+            </motion.span>
+          ))}
+          {running && (
+            <span className="font-mono text-xs px-2 py-1 border border-border bg-surface animate-pulse">
+              …
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          onClick={run}
+          disabled={running}
+          className="bg-foreground text-background font-mono text-xs uppercase tracking-widest px-3 py-1.5 hover:bg-[var(--info)] disabled:opacity-50"
         >
-          <div className="space-y-1 max-h-[460px] overflow-auto pr-1">
-            {all.map((tok, i) => {
-              const isGen = i >= prefix.length;
-              return (
-                <motion.div
-                  key={`${tok}-${i}`}
-                  initial={isGen ? { opacity: 0, x: -12 } : false}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="grid grid-cols-12 items-center gap-2"
-                >
-                  <div className="col-span-1 text-right font-mono text-tiny text-muted-foreground tabular">
-                    {String(i + 1).padStart(2, "0")}
-                  </div>
-                  <div className="col-span-1 flex justify-center">
-                    <div
-                      className={`h-3 w-3 ${
-                        isGen
-                          ? "bg-[var(--info)] border border-[var(--info)]"
-                          : "bg-card border border-border-strong"
-                      }`}
-                    />
-                  </div>
-                  <div
-                    className={`col-span-7 font-mono text-xs ${
-                      isGen ? "text-foreground" : "text-muted-foreground"
-                    }`}
-                  >
-                    {tok}
-                  </div>
-                  <div className="col-span-3 text-tiny font-mono uppercase tracking-widest">
-                    {isGen ? (
-                      <span className="text-[var(--info)]">predicted</span>
-                    ) : (
-                      <span className="text-muted-foreground">prefix</span>
-                    )}
-                  </div>
-                </motion.div>
-              );
-            })}
-            {running && (
-              <div className="font-mono text-tiny text-[var(--info)] pulse-dot pl-10 pt-1">
-                streaming next token…
-              </div>
-            )}
-          </div>
-        </Panel>
+          ▶ Run Again
+        </button>
+        {running && (
+          <button
+            onClick={stop}
+            className="border border-border font-mono text-xs uppercase tracking-widest px-3 py-1.5 hover:bg-surface"
+          >
+            ■ Stop
+          </button>
+        )}
+        {latency != null && !running && !error && (
+          <span className="text-tiny font-mono text-muted-foreground">
+            {latency.toFixed(0)}ms · {out.length} tokens
+          </span>
+        )}
+        {error && (
+          <span className="text-tiny font-mono text-destructive break-words">
+            {error}
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
 /* ============================================================ */
-/* TAB 3 · Validate Process                                     */
+/* TAB · Validate                                               */
 /* ============================================================ */
 
 function ValidateTab({ steps }: { steps: string[] }) {
@@ -950,145 +874,101 @@ function ValidateTab({ steps }: { steps: string[] }) {
   }, [steps]);
 
   const failedIds = new Set(result?.violations.map((v) => v.rule) ?? []);
-  const offenders = new Set(
-    result?.violations.map((v) => v.step_index).filter((x) => x != null) ?? [],
-  );
-  const verdict = running
-    ? "pending"
-    : !result
-      ? "pending"
-      : result.is_valid
-        ? "VALID"
-        : "INVALID";
+  const valid = result?.is_valid === 1;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-      <div className="lg:col-span-2 space-y-4">
+    <div className="space-y-4">
+      {error && (
+        <div className="text-tiny font-mono text-destructive break-words">
+          backend error · {error}
+        </div>
+      )}
+
+      {result && (
         <motion.div
-          key={verdict}
+          key={valid ? "v" : "i"}
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`border p-5 ${
-            verdict === "VALID"
+          className={`flex items-center justify-between border p-4 ${
+            valid
               ? "border-[var(--success)] bg-[var(--success)]/5"
-              : verdict === "INVALID"
-                ? "border-destructive bg-destructive/5"
-                : "border-border-strong"
+              : "border-destructive bg-destructive/5"
           }`}
         >
-          <div className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
-            QC Verdict
-          </div>
           <div
-            className={`mt-1 font-serif text-5xl ${
-              verdict === "VALID"
-                ? "text-[var(--success)]"
-                : verdict === "INVALID"
-                  ? "text-destructive"
-                  : "text-muted-foreground"
+            className={`font-serif text-4xl ${
+              valid ? "text-[var(--success)]" : "text-destructive"
             }`}
           >
-            {verdict}
+            {valid ? "✓ VALID" : "✗ INVALID"}
           </div>
-          <div className="mt-2 font-mono text-tiny text-muted-foreground">
-            {result
-              ? `${allRules.length - failedIds.size}/${allRules.length || "?"} rules satisfied · ${result.n_steps} steps`
-              : "awaiting backend…"}
+          <div className="font-mono text-xs text-right">
+            {valid
+              ? `${allRules.length - failedIds.size}/${allRules.length || "?"} rules satisfied`
+              : `${result.violations.length} violation${result.violations.length === 1 ? "" : "s"}`}
           </div>
         </motion.div>
+      )}
 
-        <Panel title="Rule Trace">
-          <div className="space-y-2">
-            {allRules.length === 0 && !running && (
-              <div className="font-mono text-tiny text-muted-foreground">
-                no rules loaded
+      {running && !result && (
+        <div className="h-20 bg-surface animate-pulse" />
+      )}
+
+      {result && result.violations.length > 0 && (
+        <div className="space-y-2">
+          {result.violations.map((v, i) => (
+            <div
+              key={`${v.rule}-${i}`}
+              className="border-l-2 border-destructive pl-3 py-2"
+            >
+              <div className="font-mono text-xs font-semibold text-destructive">
+                {v.rule}
               </div>
-            )}
+              <div className="text-xs text-foreground mt-0.5">
+                {v.description}
+              </div>
+              <div className="text-tiny font-mono text-muted-foreground mt-0.5">
+                at step {v.step_index + 1} — {v.step_name}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {allRules.length > 0 && (
+        <div>
+          <div className="text-tiny font-mono uppercase tracking-widest text-muted-foreground mb-2">
+            Rules
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
             {allRules.map((r) => {
               const failed = failedIds.has(r.id);
               return (
                 <div
                   key={r.id}
-                  className="grid grid-cols-[60px_1fr_60px] gap-2 items-center"
-                >
-                  <span className="font-mono text-tiny text-muted-foreground">
-                    {r.id}
-                  </span>
-                  <span className="text-xs">{r.description}</span>
-                  <span className="text-right font-mono text-tiny uppercase">
-                    {running || !result ? (
-                      <span className="text-muted-foreground pulse-dot">…</span>
-                    ) : failed ? (
-                      <span className="text-destructive">✗ fail</span>
-                    ) : (
-                      <span className="text-[var(--success)]">✓ pass</span>
-                    )}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </Panel>
-      </div>
-
-      <div className="lg:col-span-3 space-y-4">
-        <Panel title="Highlighted Sequence">
-          {error && (
-            <div className="mb-2 text-tiny font-mono text-destructive break-words">
-              backend error · {error}
-            </div>
-          )}
-          <div className="flex flex-wrap gap-1.5">
-            {steps.map((tok, i) => {
-              const bad = offenders.has(i);
-              return (
-                <span
-                  key={i}
-                  className={`font-mono text-xs px-2 py-1 border ${
-                    bad
-                      ? "border-destructive bg-destructive/10 text-destructive"
-                      : "border-border bg-card"
+                  className={`flex items-center gap-2 ${
+                    failed ? "text-destructive" : "text-muted-foreground"
                   }`}
                 >
-                  <span className="text-muted-foreground mr-1">
-                    {String(i + 1).padStart(2, "0")}
+                  <span className="font-mono text-tiny w-3">
+                    {failed ? "✗" : "✓"}
                   </span>
-                  {tok}
-                </span>
+                  <span className="font-mono text-tiny">{r.id}</span>
+                  <span className="text-tiny truncate opacity-70">
+                    {r.description}
+                  </span>
+                </div>
               );
             })}
           </div>
-        </Panel>
-
-        {result && result.violations.length > 0 && (
-          <Panel title="Violations">
-            <div className="space-y-2">
-              {result.violations.map((v, i) => (
-                <div
-                  key={`${v.rule}-${i}`}
-                  className="border border-destructive bg-destructive/5 p-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs text-destructive">
-                      {v.rule} · {v.description}
-                    </span>
-                    <span className="font-mono text-tiny text-destructive">
-                      step {String(v.step_index + 1).padStart(2, "0")} ·{" "}
-                      {v.step_name}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /* ============================================================ */
-/* TAB 4 · Anomaly Detection                                    */
+/* TAB · Anomaly                                                */
 /* ============================================================ */
 
 function AnomalyTab({ steps }: { steps: string[] }) {
@@ -1117,149 +997,112 @@ function AnomalyTab({ steps }: { steps: string[] }) {
     };
   }, [steps]);
 
-  const offenders = new Set(
-    result?.violations.map((v) => v.step_index).filter((x) => x != null) ?? [],
-  );
-
-  const verdict = result ? (result.is_valid ? "NORMAL" : "ANOMALY") : null;
+  const normal = result?.is_valid === 1;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-      <div className="lg:col-span-2 space-y-4">
-        <motion.div
-          key={verdict ?? "loading"}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={`border p-5 ${
-            verdict === "NORMAL"
-              ? "border-[var(--success)] bg-[var(--success)]/5"
-              : verdict === "ANOMALY"
-                ? "border-destructive bg-destructive/5"
-                : "border-border-strong"
-          }`}
-        >
-          <div className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
-            Anomaly Verdict
-          </div>
-          <div
-            className={`mt-1 font-serif text-5xl ${
-              verdict === "NORMAL"
-                ? "text-[var(--success)]"
-                : verdict === "ANOMALY"
-                  ? "text-destructive"
-                  : "text-muted-foreground"
+    <div className="space-y-4">
+      {error && (
+        <div className="text-tiny font-mono text-destructive break-words">
+          backend error · {error}
+        </div>
+      )}
+
+      {running && !result && (
+        <div className="h-20 bg-surface animate-pulse" />
+      )}
+
+      {result && (
+        <>
+          <motion.div
+            key={normal ? "n" : "a"}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`flex items-center justify-between border p-4 ${
+              normal
+                ? "border-[var(--success)] bg-[var(--success)]/5"
+                : "border-destructive bg-destructive/5"
             }`}
           >
-            {verdict ?? "…"}
-          </div>
-          <div className="mt-2 font-mono text-tiny text-muted-foreground">
-            {result
-              ? `confidence ${(result.score * 100).toFixed(0)}%`
-              : running
-                ? "running detector…"
-                : ""}
-          </div>
-        </motion.div>
+            <div
+              className={`font-serif text-4xl ${
+                normal ? "text-[var(--success)]" : "text-destructive"
+              }`}
+            >
+              ● {normal ? "NORMAL" : "ANOMALY"}
+            </div>
+            <div className="font-mono text-xs text-right">
+              {(result.score * 100).toFixed(0)}%{" "}
+              {normal ? "confidence" : "anomaly score"}
+            </div>
+          </motion.div>
 
-        <Panel title="Diagnostics">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="border border-border p-2">
-              <Label>NLL</Label>
-              <div className="font-mono text-xl tabular mt-1">
-                {result ? result.nll.toFixed(3) : "—"}
-              </div>
-            </div>
-            <div className="border border-border p-2">
-              <Label>Threshold</Label>
-              <div className="font-mono text-xl tabular mt-1">
-                {result?.threshold != null
-                  ? result.threshold.toFixed(3)
-                  : "—"}
-              </div>
-            </div>
-            <div className="border border-border p-2">
-              <Label>LM-only</Label>
-              <div className="font-mono text-xs uppercase mt-2">
-                {result
-                  ? result.lm_only.is_valid
-                    ? "normal"
-                    : "anomaly"
-                  : "—"}
-              </div>
-            </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-xs">
+            <span>
+              <span className="text-muted-foreground">NLL </span>
+              <span className="tabular">{result.nll.toFixed(3)}</span>
+            </span>
+            <span>
+              <span className="text-muted-foreground">Threshold </span>
+              <span className="tabular">
+                {result.threshold != null ? result.threshold.toFixed(3) : "—"}
+              </span>
+            </span>
+            <span>
+              <span className="text-muted-foreground">LM-only </span>
+              <span
+                className={
+                  result.lm_only.is_valid
+                    ? "text-[var(--success)]"
+                    : "text-destructive"
+                }
+              >
+                {result.lm_only.is_valid ? "✓" : "✗"}
+              </span>
+            </span>
+            {result.predicted_rule && (
+              <span>
+                <span className="text-muted-foreground">Rule </span>
+                <span>{result.predicted_rule}</span>
+              </span>
+            )}
           </div>
-          {result?.predicted_rule && (
-            <div className="mt-3 text-tiny font-mono text-muted-foreground">
-              predicted rule · {result.predicted_rule}
-            </div>
-          )}
-        </Panel>
-      </div>
 
-      <div className="lg:col-span-3 space-y-4">
-        <Panel
-          title="Sequence · Violations Highlighted"
-          meta={running ? "scanning" : "complete"}
-        >
-          {error && (
-            <div className="mb-2 text-tiny font-mono text-destructive break-words">
-              backend error · {error}
-            </div>
-          )}
-          <div className="flex flex-wrap gap-1.5">
-            {steps.map((tok, i) => {
-              const bad = offenders.has(i);
-              return (
-                <span
-                  key={i}
-                  className={`font-mono text-xs px-2 py-1 border ${
-                    bad
-                      ? "border-destructive bg-destructive/10 text-destructive"
-                      : "border-border bg-card"
-                  }`}
-                >
-                  <span className="text-muted-foreground mr-1">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  {tok}
-                </span>
-              );
-            })}
-          </div>
-        </Panel>
-
-        {result && result.violations.length > 0 && (
-          <Panel title="Violations">
+          {result.violations.length > 0 ? (
             <div className="space-y-2">
               {result.violations.map((v, i) => (
                 <div
                   key={`${v.rule}-${i}`}
-                  className="border border-destructive bg-destructive/5 p-3"
+                  className="border-l-2 border-destructive pl-3 py-2"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs text-destructive">
-                      {v.rule} · {v.description}
-                    </span>
-                    <span className="font-mono text-tiny text-destructive">
-                      step {String(v.step_index + 1).padStart(2, "0")} ·{" "}
-                      {v.step_name}
-                    </span>
+                  <div className="font-mono text-xs font-semibold text-destructive">
+                    {v.rule}
+                  </div>
+                  <div className="text-xs text-foreground mt-0.5">
+                    {v.description}
+                  </div>
+                  <div className="text-tiny font-mono text-muted-foreground mt-0.5">
+                    at step {v.step_index + 1} — {v.step_name}
                   </div>
                 </div>
               ))}
             </div>
-          </Panel>
-        )}
-      </div>
+          ) : (
+            <div className="text-tiny font-mono text-muted-foreground">
+              No rule violations detected
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
 /* ============================================================ */
-/* Metrics table — shared by OOD and Batch tabs                 */
+/* Metrics table — shared by Batch tab                          */
 /* ============================================================ */
 
 type Task = "nextstep" | "completion" | "anomaly";
+type EvalMode = "standard" | "ood";
 
 const METRIC_COLUMNS: Record<Task, { key: string; label: string }[]> = {
   nextstep: [
@@ -1365,130 +1208,13 @@ function MetricsTable({
 }
 
 /* ============================================================ */
-/* TAB 5 · OOD Analysis                                         */
-/* ============================================================ */
-
-function OODTab() {
-  const [task, setTask] = useState<Task>("nextstep");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<OODEval | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const onFile = (f: File | null) => {
-    if (!f) return;
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    api
-      .evalOOD(f, task)
-      .then(setResult)
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
-  };
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-      <div className="lg:col-span-2 space-y-4">
-        <Panel title="Held-Out Evaluation">
-          <div className="text-tiny font-mono text-muted-foreground leading-relaxed">
-            Upload an OOD evaluation CSV. The backend scores per-family and
-            returns an `ALL` row plus per-family breakdown. Use the same CSV
-            schema as Batch Eval for the chosen task.
-          </div>
-          <div className="mt-3 space-y-2">
-            <Label>Task</Label>
-            <select
-              value={task}
-              onChange={(e) => setTask(e.target.value as Task)}
-              className="w-full bg-background border border-border font-mono text-xs px-2 py-2"
-            >
-              <option value="nextstep">Next-step</option>
-              <option value="completion">Completion</option>
-              <option value="anomaly">Anomaly</option>
-            </select>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv"
-              onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-              className="hidden"
-            />
-            <button
-              onClick={() => fileRef.current?.click()}
-              disabled={loading}
-              className="w-full border border-dashed border-border-strong bg-card hover:bg-surface py-6 font-mono text-xs uppercase tracking-widest disabled:opacity-50"
-            >
-              {loading ? "● scoring…" : "⬆ Upload OOD CSV"}
-            </button>
-            {error && (
-              <div className="text-tiny font-mono text-destructive break-words">
-                {error}
-              </div>
-            )}
-          </div>
-        </Panel>
-
-        {result && (
-          <Panel title="Family Counts">
-            <div className="space-y-1">
-              {Object.entries(result.family_counts).map(([k, v]) => (
-                <div
-                  key={k}
-                  className="grid grid-cols-[1fr_60px] font-mono text-xs"
-                >
-                  <span>{k}</span>
-                  <span className="text-right tabular text-muted-foreground">
-                    {v}
-                  </span>
-                </div>
-              ))}
-              <div className="mt-2 pt-2 border-t border-border grid grid-cols-[1fr_60px] font-mono text-xs">
-                <span className="text-[var(--info)]">TOTAL</span>
-                <span className="text-right tabular">{result.n}</span>
-              </div>
-            </div>
-          </Panel>
-        )}
-      </div>
-
-      <div className="lg:col-span-3 space-y-4">
-        <Panel title="Per-Family Metrics" meta={result ? `n=${result.n}` : ""}>
-          {!result && !loading && (
-            <div className="font-mono text-tiny text-muted-foreground">
-              upload a CSV to compute metrics.
-            </div>
-          )}
-          {loading && (
-            <div className="font-mono text-tiny text-[var(--info)] pulse-dot">
-              evaluating…
-            </div>
-          )}
-          {result && (
-            <MetricsTable
-              task={task}
-              metrics={
-                result.metrics as unknown as Record<
-                  string,
-                  Record<string, number>
-                > | null
-              }
-            />
-          )}
-        </Panel>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================ */
-/* TAB 6 · Batch Eval (CSV)                                     */
+/* TAB · Batch Eval                                             */
 /* ============================================================ */
 
 type BatchResult =
-  | { task: "nextstep"; data: NextStepEval }
-  | { task: "completion"; data: CompletionEval }
-  | { task: "anomaly"; data: AnomalyEval };
+  | { task: "nextstep"; mode: EvalMode; data: NextStepEval | OODEval }
+  | { task: "completion"; mode: EvalMode; data: CompletionEval | OODEval }
+  | { task: "anomaly"; mode: EvalMode; data: AnomalyEval | OODEval };
 
 function csvEscape(v: string): string {
   if (v.includes(",") || v.includes('"') || v.includes("\n")) {
@@ -1509,7 +1235,6 @@ function downloadCsv(filename: string, rows: string[][]) {
 }
 
 function nedFromTokens(a: string[], b: string[]): number {
-  // Levenshtein on tokens, normalized by max(len). Returns 0..1.
   const m = a.length;
   const n = b.length;
   if (!m && !n) return 0;
@@ -1532,6 +1257,7 @@ function nedFromTokens(a: string[], b: string[]): number {
 
 function BatchEvalTab() {
   const [task, setTask] = useState<Task>("nextstep");
+  const [mode, setMode] = useState<EvalMode>("standard");
   const [loading, setLoading] = useState(false);
   const [elapsed, setElapsed] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1551,15 +1277,18 @@ function BatchEvalTab() {
     const t0 = Date.now();
     try {
       let res: BatchResult;
-      if (task === "nextstep") {
+      if (mode === "ood") {
+        const data = await api.evalOOD(f, task);
+        res = { task, mode, data } as BatchResult;
+      } else if (task === "nextstep") {
         const data = await api.evalNextStep(f);
-        res = { task, data };
+        res = { task, mode, data };
       } else if (task === "completion") {
         const data = await api.evalCompletion(f);
-        res = { task, data };
+        res = { task, mode, data };
       } else {
         const data = await api.evalAnomaly(f);
-        res = { task, data };
+        res = { task, mode, data };
       }
       setResult(res);
       setElapsed(Date.now() - t0);
@@ -1570,9 +1299,23 @@ function BatchEvalTab() {
     }
   };
 
+  const isStandard = result?.mode === "standard";
+  const standardRows: (
+    | NextStepEval["rows"][number]
+    | CompletionEval["rows"][number]
+    | AnomalyEval["rows"][number]
+  )[] = isStandard
+    ? (result!.data as NextStepEval | CompletionEval | AnomalyEval).rows
+    : [];
+  const totalPages = Math.max(1, Math.ceil(standardRows.length / PAGE_SIZE));
+  const pageRows = standardRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const n = result?.data.n ?? 0;
+  const perRowMs = elapsed != null && n ? elapsed / n : null;
+
   const downloadPredictions = () => {
-    if (!result) return;
+    if (!result || !isStandard) return;
     if (result.task === "nextstep") {
+      const data = result.data as NextStepEval;
       const header = [
         "EXAMPLE_ID",
         "FAMILY",
@@ -1587,7 +1330,7 @@ function BatchEvalTab() {
         "PRED_5",
         "PROB_5",
       ];
-      const rows = result.data.rows.map((r) => {
+      const rows = data.rows.map((r) => {
         const cells = [r.example_id, r.family];
         for (let i = 0; i < 5; i++) {
           const p = r.predictions[i];
@@ -1597,14 +1340,16 @@ function BatchEvalTab() {
       });
       downloadCsv("predictions_nextstep.csv", [header, ...rows]);
     } else if (result.task === "completion") {
+      const data = result.data as CompletionEval;
       const header = ["EXAMPLE_ID", "FAMILY", "PREDICTED"];
-      const rows = result.data.rows.map((r) => [
+      const rows = data.rows.map((r) => [
         r.example_id,
         r.family,
         r.predicted.join("|"),
       ]);
       downloadCsv("predictions_completion.csv", [header, ...rows]);
     } else {
+      const data = result.data as AnomalyEval;
       const header = [
         "EXAMPLE_ID",
         "FAMILY",
@@ -1613,7 +1358,7 @@ function BatchEvalTab() {
         "PREDICTED_RULE",
         "NLL",
       ];
-      const rows = result.data.rows.map((r) => [
+      const rows = data.rows.map((r) => [
         r.example_id,
         r.family,
         String(r.is_valid),
@@ -1625,176 +1370,168 @@ function BatchEvalTab() {
     }
   };
 
-  const rows = result?.data.rows ?? [];
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  const pageRows = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const perRowMs = elapsed != null && rows.length ? elapsed / rows.length : null;
-
   const csvHelp = useMemo(
     () => ({
       nextstep:
-        "EXAMPLE_ID, FAMILY, PARTIAL_SEQUENCE  (+ optional TRUE_NEXT_STEP). SEQUENCE cells use `|` separators.",
+        "Next-step:  EXAMPLE_ID, FAMILY, PARTIAL_SEQUENCE (pipe-separated; optional TRUE_NEXT_STEP)",
       completion:
-        "EXAMPLE_ID, FAMILY, PARTIAL_SEQUENCE  (+ optional TRUE_SUFFIX, COMPLETION_FRACTION). SEQUENCE cells use `|` separators.",
+        "Completion: EXAMPLE_ID, FAMILY, PARTIAL_SEQUENCE (optional TRUE_SUFFIX)",
       anomaly:
-        "EXAMPLE_ID, FAMILY, SEQUENCE  (+ optional IS_VALID, RULE_VIOLATED). SEQUENCE cells use `|` separators.",
+        "Anomaly:    EXAMPLE_ID, FAMILY, SEQUENCE (optional IS_VALID)",
     }),
     [],
   );
 
+  const metrics =
+    result?.data.metrics as unknown as Record<
+      string,
+      Record<string, number>
+    > | null;
+
   return (
     <div className="space-y-4">
-      <Panel
-        title="Batch Eval · Upload CSV"
-        meta={
-          loading
-            ? "running"
-            : result
-              ? `${result.data.n} rows · ${elapsed?.toFixed(0)} ms`
-              : "idle"
-        }
-      >
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-4">
-          <div className="space-y-3">
-            <Label>Task</Label>
-            <div className="grid grid-cols-3 border border-border">
-              {(["nextstep", "completion", "anomaly"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTask(t)}
-                  className={`px-2 py-2 font-mono text-tiny uppercase tracking-widest border-r border-border last:border-r-0 ${
-                    task === t
-                      ? "bg-foreground text-background"
-                      : "bg-card hover:bg-surface"
-                  }`}
-                >
-                  {t === "nextstep"
-                    ? "Next-step"
-                    : t === "completion"
-                      ? "Completion"
-                      : "Anomaly"}
-                </button>
-              ))}
-            </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv"
-              onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-              className="hidden"
-            />
-            <button
-              onClick={() => fileRef.current?.click()}
-              disabled={loading}
-              className="w-full border border-dashed border-border-strong bg-card hover:bg-surface py-6 font-mono text-xs uppercase tracking-widest disabled:opacity-50"
-            >
-              {loading ? "● evaluating…" : "⬆ Choose CSV"}
-            </button>
-            {result && (
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+            Task
+          </span>
+          <div className="flex border border-border">
+            {(["nextstep", "completion", "anomaly"] as const).map((t) => (
               <button
-                onClick={downloadPredictions}
-                className="w-full bg-foreground text-background font-mono text-xs uppercase tracking-widest py-2 hover:bg-[var(--info)]"
+                key={t}
+                onClick={() => setTask(t)}
+                className={`px-2.5 py-1 font-mono text-tiny uppercase tracking-widest border-r border-border last:border-r-0 ${
+                  task === t
+                    ? "bg-foreground text-background"
+                    : "bg-card hover:bg-surface"
+                }`}
               >
-                ⬇ Download predictions.csv
+                {t === "nextstep"
+                  ? "Next-step"
+                  : t === "completion"
+                    ? "Completion"
+                    : "Anomaly"}
               </button>
-            )}
-            {loading && (
-              <div className="h-1 bg-border relative overflow-hidden">
-                <motion.div
-                  animate={{ x: ["-100%", "100%"] }}
-                  transition={{ duration: 1.4, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-y-0 w-1/3 bg-[var(--info)]"
-                />
-              </div>
-            )}
-            {error && (
-              <div className="text-tiny font-mono text-destructive break-words">
-                {error}
-              </div>
-            )}
-          </div>
-          <div className="border border-border bg-card p-3">
-            <Label>Expected CSV columns · {task}</Label>
-            <div className="mt-1 font-mono text-tiny text-muted-foreground leading-relaxed">
-              {csvHelp[task]}
-            </div>
+            ))}
           </div>
         </div>
-      </Panel>
+
+        <div className="flex items-center gap-2">
+          <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+            Mode
+          </span>
+          <div className="flex border border-border">
+            {(["standard", "ood"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`px-2.5 py-1 font-mono text-tiny uppercase tracking-widest border-r border-border last:border-r-0 ${
+                  mode === m
+                    ? "bg-foreground text-background"
+                    : "bg-card hover:bg-surface"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".csv"
+        onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+        className="hidden"
+      />
+      <button
+        onClick={() => fileRef.current?.click()}
+        disabled={loading}
+        className="w-full border border-dashed border-border-strong bg-card hover:bg-surface py-10 font-mono text-xs uppercase tracking-widest disabled:opacity-50"
+      >
+        {loading ? "● evaluating…" : "DROP CSV OR CLICK TO UPLOAD"}
+      </button>
+
+      <div className="text-tiny font-mono text-muted-foreground space-y-0.5">
+        <div>{csvHelp.nextstep}</div>
+        <div>{csvHelp.completion}</div>
+        <div>{csvHelp.anomaly}</div>
+      </div>
+
+      {loading && (
+        <div className="h-1 bg-border relative overflow-hidden">
+          <motion.div
+            animate={{ x: ["-100%", "100%"] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: "linear" }}
+            className="absolute inset-y-0 w-1/3 bg-[var(--info)]"
+          />
+        </div>
+      )}
+
+      {error && (
+        <div className="text-tiny font-mono text-destructive break-words">
+          {error}
+        </div>
+      )}
 
       {result && (
         <>
-          <Panel title="Per-Family Metrics" meta={`n=${result.data.n}`}>
-            <MetricsTable
-              task={result.task}
-              metrics={
-                result.data.metrics as unknown as Record<
-                  string,
-                  Record<string, number>
-                > | null
-              }
-            />
-          </Panel>
+          <MetricsTable task={result.task} metrics={metrics} />
 
-          <Panel title="Latency">
-            <div className="grid grid-cols-3 gap-2">
-              <div className="border border-border p-2">
-                <Label>Total</Label>
-                <div className="font-mono text-2xl tabular mt-1">
-                  {elapsed?.toFixed(0)} ms
-                </div>
-              </div>
-              <div className="border border-border p-2">
-                <Label>Per-row avg</Label>
-                <div className="font-mono text-2xl tabular mt-1">
-                  {perRowMs != null ? perRowMs.toFixed(1) + " ms" : "—"}
-                </div>
-              </div>
-              <div className="border border-border p-2">
-                <Label>Rows</Label>
-                <div className="font-mono text-2xl tabular mt-1">
-                  {rows.length}
-                </div>
-              </div>
-            </div>
-          </Panel>
+          <div className="text-tiny font-mono text-muted-foreground">
+            {elapsed?.toFixed(0)}ms total ·{" "}
+            {perRowMs != null ? perRowMs.toFixed(1) : "—"}ms per row · {n} rows
+            {result.mode === "ood" && " · OOD"}
+          </div>
 
-          <Panel
-            title="Per-Row Results"
-            meta={`page ${page + 1} / ${totalPages}`}
-          >
-            <div className="border border-border overflow-auto max-h-[460px]">
-              {result.task === "nextstep" && (
-                <PerRowNextStep rows={pageRows as NextStepEval["rows"]} />
-              )}
-              {result.task === "completion" && (
-                <PerRowCompletion rows={pageRows as CompletionEval["rows"]} />
-              )}
-              {result.task === "anomaly" && (
-                <PerRowAnomaly rows={pageRows as AnomalyEval["rows"]} />
-              )}
+          {isStandard && (
+            <button
+              onClick={downloadPredictions}
+              className="bg-foreground text-background font-mono text-xs uppercase tracking-widest px-3 py-1.5 hover:bg-[var(--info)]"
+            >
+              ↓ Download predictions.csv
+            </button>
+          )}
+
+          {isStandard && (
+            <div>
+              <div className="border border-border overflow-auto max-h-[460px]">
+                {result.task === "nextstep" && (
+                  <PerRowNextStep rows={pageRows as NextStepEval["rows"]} />
+                )}
+                {result.task === "completion" && (
+                  <PerRowCompletion
+                    rows={pageRows as CompletionEval["rows"]}
+                  />
+                )}
+                {result.task === "anomaly" && (
+                  <PerRowAnomaly rows={pageRows as AnomalyEval["rows"]} />
+                )}
+              </div>
+              <div className="flex items-center justify-between mt-3 font-mono text-xs">
+                <button
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="px-3 py-1 border border-border disabled:opacity-30"
+                >
+                  ← prev
+                </button>
+                <span className="text-muted-foreground">
+                  rows {page * PAGE_SIZE + 1}–
+                  {Math.min(standardRows.length, (page + 1) * PAGE_SIZE)} of{" "}
+                  {standardRows.length}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="px-3 py-1 border border-border disabled:opacity-30"
+                >
+                  next →
+                </button>
+              </div>
             </div>
-            <div className="flex items-center justify-between mt-3 font-mono text-xs">
-              <button
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={page === 0}
-                className="px-3 py-1 border border-border disabled:opacity-30"
-              >
-                ← prev
-              </button>
-              <span className="text-muted-foreground">
-                rows {page * PAGE_SIZE + 1}–
-                {Math.min(rows.length, (page + 1) * PAGE_SIZE)} of {rows.length}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                disabled={page >= totalPages - 1}
-                className="px-3 py-1 border border-border disabled:opacity-30"
-              >
-                next →
-              </button>
-            </div>
-          </Panel>
+          )}
         </>
       )}
     </div>
@@ -1936,16 +1673,10 @@ function PerRowAnomaly({ rows }: { rows: AnomalyEval["rows"] }) {
 /* Container                                                    */
 /* ============================================================ */
 
-function basename(p: string | null | undefined): string {
-  if (!p) return "—";
-  const parts = p.split(/[\\/]/);
-  return parts[parts.length - 1] || p;
-}
-
 export function ProcessLab() {
   const [dataset, setDataset] = useState<Dataset>(DATASETS.MOSFET);
   const [steps, setSteps] = useState<string[]>(DATASETS.MOSFET.steps);
-  const [selected, setSelected] = useState(4);
+  const [cursor, setCursor] = useState(4);
   const [tab, setTab] = useState<TabId>("predict");
   const [health, setHealth] = useState<Health | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
@@ -1957,10 +1688,9 @@ export function ProcessLab() {
       .catch((e) => setHealthError(String(e)));
   }, []);
 
-  // clamp selection when steps change
   useEffect(() => {
-    if (selected >= steps.length) setSelected(Math.max(0, steps.length - 1));
-  }, [steps.length, selected]);
+    if (cursor >= steps.length) setCursor(Math.max(0, steps.length - 1));
+  }, [steps.length, cursor]);
 
   const healthOk = !!health?.ok;
   const healthLabel = healthError
@@ -1970,130 +1700,73 @@ export function ProcessLab() {
       : healthOk
         ? `READY · ${health.device} · vocab ${health.vocab_size}`
         : `NO CHECKPOINT — ${health.load_error ?? "unknown"}`;
+  const healthTone = healthError || (health && !healthOk) ? "warning" : "success";
 
   return (
-    <section className="px-4 md:px-6 lg:px-8 pt-10">
+    <section className="px-4 md:px-6 lg:px-8 pt-6">
       <div className="border border-border-strong bg-card">
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-border bg-surface">
-          <div className="flex items-center gap-3">
-            <StatusDot color="info" />
-            <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
-              § Lab · Primary Workstation
-            </span>
-            <span className="text-tiny font-mono text-muted-foreground">/</span>
-            <span className="text-tiny font-mono text-[var(--info)] uppercase tracking-widest">
-              Process Lab
-            </span>
-          </div>
-          <div className="flex items-center gap-4 text-tiny font-mono text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <StatusDot
-                color={
-                  healthError || (health && !healthOk) ? "warning" : "success"
-                }
-              />
-              <span
-                className={
-                  healthError || (health && !healthOk)
-                    ? "text-[var(--warning)]"
-                    : "text-[var(--success)]"
-                }
-              >
-                {healthLabel}
-              </span>
-            </span>
-            <span>·</span>
-            <span>RECIPE {dataset.id}</span>
-            <span>·</span>
-            <span>{steps.length} steps</span>
-          </div>
-        </div>
-
-        <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-4 px-5 py-5 border-b border-border">
-          <div>
-            <h2 className="font-serif text-4xl leading-tight">
-              The semiconductor engineer's workstation.
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
-              Import a wafer recipe, walk the manufacturing pipeline, and drive
-              SiliconGPT across six inference tasks — prediction, completion,
-              validation, anomaly detection, OOD analysis, and batch evaluation.
-            </p>
-          </div>
-          <div className="grid grid-cols-3 gap-6 font-mono">
-            <div>
-              <Label>Active Family</Label>
-              <div className="text-sm mt-1">{dataset.family}</div>
-            </div>
-            <div>
-              <Label>Cursor</Label>
-              <div className="text-sm mt-1 text-[var(--info)]">
-                {String(selected + 1).padStart(2, "0")} / {steps.length}
-              </div>
-            </div>
-            <div>
-              <Label>Checkpoint</Label>
-              <div
-                className={`text-sm mt-1 ${
-                  healthOk ? "text-[var(--success)]" : "text-muted-foreground"
-                }`}
-              >
-                {health?.ckpt_path
-                  ? basename(health.ckpt_path)
-                  : healthError
-                    ? "offline"
-                    : "loading…"}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 1 + Step 2 grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-4 p-4 border-b border-border bg-surface">
-          <ImportPanel
-            dataset={dataset}
-            setDataset={setDataset}
-            setSteps={setSteps}
-          />
-          <SequenceExplorer
-            steps={steps}
-            selected={selected}
-            setSelected={setSelected}
-          />
-        </div>
-
-        {/* Step 3 — task tabs */}
-        <TabBar tab={tab} setTab={setTab} />
-        <div className="p-5 bg-surface min-h-[560px]">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={tab}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.22 }}
+        {/* One-line header */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 border-b border-border bg-surface">
+          <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+            SILICON GPT · PROCESS LAB
+          </span>
+          <span className="flex items-center gap-2">
+            <StatusDot color={healthTone} />
+            <span
+              className={`text-tiny font-mono ${
+                healthTone === "warning"
+                  ? "text-[var(--warning)]"
+                  : "text-[var(--success)]"
+              }`}
             >
-              {tab === "predict" && (
-                <PredictTab
-                  dataset={dataset}
-                  steps={steps}
-                  cursor={selected}
-                />
-              )}
-              {tab === "complete" && (
-                <CompleteTab
-                  dataset={dataset}
-                  steps={steps}
-                  cursor={selected}
-                />
-              )}
-              {tab === "validate" && <ValidateTab steps={steps} />}
-              {tab === "anomaly" && <AnomalyTab steps={steps} />}
-              {tab === "ood" && <OODTab />}
-              {tab === "batch" && <BatchEvalTab />}
-            </motion.div>
-          </AnimatePresence>
+              {healthLabel}
+            </span>
+          </span>
+        </div>
+
+        <ImportToolbar
+          dataset={dataset}
+          setDataset={setDataset}
+          setSteps={setSteps}
+          setCursor={setCursor}
+        />
+
+        <RecipeStrip
+          steps={steps}
+          cursor={cursor}
+          setCursor={setCursor}
+          dataset={dataset}
+          health={health}
+        />
+
+        <TabBar tab={tab} setTab={setTab} />
+
+        <div className="bg-surface">
+          <div className="px-4 py-5 max-w-3xl mx-auto">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={tab}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.22 }}
+              >
+                {tab === "predict" && (
+                  <PredictTab steps={steps} cursor={cursor} />
+                )}
+                {tab === "complete" && (
+                  <CompleteTab
+                    dataset={dataset}
+                    steps={steps}
+                    cursor={cursor}
+                  />
+                )}
+                {tab === "validate" && <ValidateTab steps={steps} />}
+                {tab === "anomaly" && <AnomalyTab steps={steps} />}
+                {tab === "batch" && <BatchEvalTab />}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </section>
