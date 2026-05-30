@@ -39,6 +39,10 @@ export function ModelLogo({ name, size = 16 }: Props) {
     );
   }
 
+  if (n.includes("silicon")) {
+    return null;
+  }
+
   if (n.includes("gpt") || n.includes("openai")) {
     // OpenAI mark
     return (
@@ -49,6 +53,7 @@ export function ModelLogo({ name, size = 16 }: Props) {
       </Wrap>
     );
   }
+
 
   if (n.includes("qwen")) {
     return (
