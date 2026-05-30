@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Panel, StatusDot, Label } from "./primitives";
+import {
+  api,
+  type AnomalyEval,
+  type AnomalyResult,
+  type CompletionEval,
+  type Health,
+  type NextStepEval,
+  type OODEval,
+  type Prediction,
+  type Violation,
+} from "@/lib/api";
 
 /* ============================================================ */
 /* Domain data                                                  */
@@ -14,112 +25,120 @@ type Dataset = {
   steps: string[];
 };
 
+// IMPORTANT: tokens use SPACES (real backend vocab), not underscores.
 const DATASETS: Record<string, Dataset> = {
   MOSFET: {
     id: "MOSFET",
     family: "Power MOSFET",
     node: "0.5 µm · 6\" wafer",
-    description: "Planar n-channel MOSFET, 20-step reference recipe",
+    description: "Planar n-channel MOSFET, 23-step reference recipe",
     steps: [
-      "RECEIVE_WAFER",
-      "RCA_CLEAN",
-      "THERMAL_OXIDATION",
-      "PHOTORESIST",
-      "ALIGN_MASK",
-      "EXPOSE",
-      "DEVELOP",
-      "OXIDE_ETCH",
-      "HARD_BAKE",
-      "ION_IMPLANT_N",
-      "ANNEAL_RTP",
-      "GATE_OXIDE",
-      "POLY_DEPOSITION",
-      "POLY_ETCH",
-      "SOURCE_DRAIN_IMPLANT",
-      "ANNEAL_FURNACE",
-      "METAL_DEPOSITION",
-      "METAL_ETCH",
-      "PASSIVATION",
-      "CD_MEASUREMENT",
+      "RECEIVE WAFER",
+      "RCA CLEAN",
+      "GROW THERMAL OXIDE",
+      "DEPOSIT POLYSILICON",
+      "PHOTORESIST COAT",
+      "ALIGN MASK LEVEL 1",
+      "EXPOSE LITHO LEVEL 1",
+      "DEVELOP PHOTORESIST",
+      "ETCH POLYSILICON",
+      "STRIP PHOTORESIST",
+      "IMPLANT N+",
+      "ANNEAL DOPANTS",
+      "DEPOSIT ILD",
+      "CMP ILD",
+      "PHOTORESIST COAT",
+      "ALIGN MASK LEVEL 2",
+      "EXPOSE LITHO LEVEL 2",
+      "DEVELOP PHOTORESIST",
+      "ETCH CONTACT",
+      "DEPOSIT METAL 1",
+      "ETCH METAL 1",
+      "DEPOSIT PASSIVATION",
+      "ELECTRICAL TEST",
     ],
   },
   IGBT: {
     id: "IGBT",
     family: "Insulated-Gate Bipolar Transistor",
     node: "1.2 µm · 8\" wafer",
-    description: "Trench IGBT with backside collector, 17-step recipe",
+    description: "Trench IGBT with backside collector, 18-step recipe",
     steps: [
-      "RECEIVE_WAFER",
-      "RCA_CLEAN",
-      "EPI_GROWTH",
-      "FIELD_OXIDE",
-      "PHOTORESIST",
-      "EXPOSE",
-      "DEVELOP",
-      "P_BASE_IMPLANT",
-      "DRIVE_IN",
-      "N_PLUS_IMPLANT",
-      "ANNEAL_RTP",
-      "GATE_OXIDATION",
-      "POLY_GATE",
-      "EMITTER_METAL",
-      "BACKSIDE_GRIND",
-      "COLLECTOR_METAL",
-      "PASSIVATION",
+      "RECEIVE WAFER",
+      "RCA CLEAN",
+      "DEPOSIT EPI LAYER",
+      "GROW FIELD OXIDE",
+      "PHOTORESIST COAT",
+      "ALIGN MASK LEVEL 1",
+      "EXPOSE LITHO LEVEL 1",
+      "DEVELOP PHOTORESIST",
+      "IMPLANT P-BASE",
+      "DRIVE IN",
+      "GROW GATE OXIDE",
+      "DEPOSIT POLYSILICON",
+      "ETCH POLYSILICON",
+      "DEPOSIT METAL 1",
+      "BACKSIDE GRIND",
+      "DEPOSIT BACKSIDE METAL",
+      "DEPOSIT PASSIVATION",
+      "ELECTRICAL TEST",
     ],
   },
   IC: {
     id: "IC",
-    family: "CMOS Logic (BEOL+FEOL)",
+    family: "CMOS Logic (FEOL + BEOL)",
     node: "28 nm · 12\" wafer",
-    description: "Full CMOS flow with Cu damascene BEOL, 22-step recipe",
+    description: "Full CMOS flow with damascene BEOL, 23-step recipe",
     steps: [
-      "RECEIVE_WAFER",
-      "RCA_CLEAN",
-      "STI_ETCH",
-      "STI_FILL",
-      "CMP_OXIDE",
-      "WELL_IMPLANT",
-      "GATE_OXIDE",
-      "POLY_DEPOSITION",
-      "GATE_LITHO",
-      "GATE_ETCH",
-      "LDD_IMPLANT",
-      "SPACER_DEPOSIT",
-      "SD_IMPLANT",
-      "SILICIDE",
-      "ILD_DEPOSIT",
-      "CONTACT_ETCH",
-      "W_FILL",
-      "CMP_W",
-      "M1_LITHO",
-      "M1_ETCH",
-      "CU_DAMASCENE",
-      "CMP_CU",
+      "RECEIVE WAFER",
+      "RCA CLEAN",
+      "ETCH STI",
+      "DEPOSIT STI OXIDE",
+      "CMP OXIDE",
+      "IMPLANT WELL",
+      "GROW GATE OXIDE",
+      "DEPOSIT POLYSILICON",
+      "PHOTORESIST COAT",
+      "ALIGN MASK LEVEL 1",
+      "EXPOSE LITHO LEVEL 1",
+      "DEVELOP PHOTORESIST",
+      "ETCH POLYSILICON",
+      "IMPLANT LDD",
+      "DEPOSIT SPACER",
+      "IMPLANT S/D",
+      "ANNEAL DOPANTS",
+      "DEPOSIT ILD",
+      "ETCH CONTACT",
+      "DEPOSIT METAL 1",
+      "ETCH METAL 1",
+      "DEPOSIT PASSIVATION",
+      "ELECTRICAL TEST",
     ],
   },
   OOD: {
     id: "OOD",
     family: "Novel Device · Held-Out",
     node: "Sub-2 nm · research",
-    description: "Out-of-distribution sample. Not seen during training.",
+    description:
+      "Out-of-distribution sample. Tokens are illustrative — most will resolve to <UNK>.",
     steps: [
-      "RECEIVE_WAFER",
-      "CRYO_ETCH",
-      "2D_TRANSFER_MoS2",
-      "ALD_HfZrO2",
-      "FERRO_ANNEAL",
-      "GRAPHENE_CONTACT",
-      "BEOL_AIR_GAP",
-      "PHOTONIC_COUPLER",
+      "RECEIVE WAFER",
+      "CRYO ETCH",
+      "2D TRANSFER MoS2",
+      "ALD HfZrO2",
+      "FERRO ANNEAL",
+      "GRAPHENE CONTACT",
+      "BEOL AIR GAP",
+      "PHOTONIC COUPLER",
     ],
   },
 };
 
 const PROCESS_STAGE: Record<string, string> = {
   RECEIVE: "Incoming",
-  CLEAN: "Surface Prep",
   RCA: "Surface Prep",
+  CLEAN: "Surface Prep",
+  GROW: "FEOL · Oxide",
   THERMAL: "FEOL · Oxide",
   EPI: "FEOL · Epi",
   FIELD: "FEOL · Isolation",
@@ -127,33 +146,32 @@ const PROCESS_STAGE: Record<string, string> = {
   WELL: "FEOL · Doping",
   GATE: "FEOL · Gate",
   POLY: "FEOL · Gate",
-  ION: "FEOL · Doping",
+  POLYSILICON: "FEOL · Gate",
+  IMPLANT: "FEOL · Doping",
   LDD: "FEOL · Doping",
-  SD: "FEOL · Doping",
-  P_BASE: "FEOL · Doping",
-  N_PLUS: "FEOL · Doping",
-  SOURCE: "FEOL · Doping",
   ANNEAL: "Thermal",
   DRIVE: "Thermal",
-  HARD: "Lithography",
   PHOTORESIST: "Lithography",
   ALIGN: "Lithography",
   EXPOSE: "Lithography",
   DEVELOP: "Lithography",
-  M1: "BEOL · Metal",
+  STRIP: "Lithography",
+  HARD: "Lithography",
+  CMP: "BEOL · Planarize",
   ILD: "BEOL · Dielectric",
   CONTACT: "BEOL · Contact",
   SILICIDE: "BEOL · Contact",
   SPACER: "FEOL · Gate",
-  OXIDE: "Lithography",
   METAL: "BEOL · Metal",
+  ETCH: "Etch",
+  DEPOSIT: "Deposition",
   W: "BEOL · Metal",
   CU: "BEOL · Metal",
-  CMP: "BEOL · Planarize",
   BACKSIDE: "Backside",
   COLLECTOR: "Backside",
   EMITTER: "BEOL · Metal",
   PASSIVATION: "Final",
+  ELECTRICAL: "Metrology",
   CD: "Metrology",
   CRYO: "Novel",
   "2D": "Novel · 2D",
@@ -165,54 +183,22 @@ const PROCESS_STAGE: Record<string, string> = {
 };
 
 function stageOf(step: string): string {
-  const head = step.split("_")[0];
+  // Tokens are space-separated; fall back to underscore for legacy / OOD.
+  const head = step.split(/[\s_]/)[0];
   return PROCESS_STAGE[head] ?? PROCESS_STAGE[step] ?? "Process";
 }
 
-/* ---------- pseudo model ---------- */
-
-function seededRand(seed: number) {
-  let s = seed >>> 0 || 1;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 0xffffffff;
-  };
-}
-
-// universe of plausible next steps shared across datasets
-const ALL_STEPS = Array.from(
-  new Set(Object.values(DATASETS).flatMap((d) => d.steps)),
-);
-
-function predictTop5(prefix: string[], dataset: Dataset): { token: string; prob: number }[] {
-  const seed = prefix.reduce((a, t, i) => a + t.charCodeAt(0) * (i + 11), 7);
-  const rand = seededRand(seed);
-  const last = prefix[prefix.length - 1] ?? "";
-  const nextInDataset = dataset.steps[prefix.length];
-  const candidates = ALL_STEPS.filter((s) => s !== last);
-  const scored = candidates.map((s) => {
-    let w = rand() * 0.4;
-    if (s === nextInDataset) w += 2.2; // strong correct-answer bias
-    if (last.includes("PHOTORESIST") && s.includes("ALIGN")) w += 0.6;
-    if (last.includes("ALIGN") && s.includes("EXPOSE")) w += 0.8;
-    if (last.includes("EXPOSE") && s.includes("DEVELOP")) w += 1.0;
-    if (last.includes("DEVELOP") && s.includes("ETCH")) w += 0.7;
-    if (last.includes("IMPLANT") && s.includes("ANNEAL")) w += 0.9;
-    if (last.includes("METAL_DEPOSITION") && s.includes("METAL_ETCH")) w += 0.8;
-    if (last.includes("CONTACT_ETCH") && s.includes("W_FILL")) w += 0.6;
-    if (last.includes("W_FILL") && s.includes("CMP_W")) w += 0.7;
-    return { token: s, w };
-  });
-  scored.sort((a, b) => b.w - a.w);
-  const top = scored.slice(0, 5);
-  const exps = top.map((s) => Math.exp(s.w));
-  const sum = exps.reduce((a, b) => a + b, 0);
-  return top.map((s, i) => ({ token: s.token, prob: exps[i] / sum }));
+// Normalize a raw user-pasted token: trim, collapse whitespace, uppercase.
+// Spaces inside the token are PRESERVED — the backend vocab uses them.
+function normalizeToken(raw: string): string {
+  return raw.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
 /* ============================================================ */
 /* Step 1 — Import Data                                         */
 /* ============================================================ */
+
+type ImportMode = "demo" | "paste" | "upload" | "random";
 
 function ImportPanel({
   dataset,
@@ -223,15 +209,24 @@ function ImportPanel({
   setDataset: (d: Dataset) => void;
   setSteps: (s: string[]) => void;
 }) {
-  const [mode, setMode] = useState<"demo" | "paste" | "upload">("demo");
+  const [mode, setMode] = useState<ImportMode>("demo");
   const [paste, setPaste] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Random mode state
+  const [temperature, setTemperature] = useState(0.9);
+  const [randPrefix, setRandPrefix] = useState("");
+  const [randLoading, setRandLoading] = useState(false);
+  const [randError, setRandError] = useState<string | null>(null);
+
+  const parseTokens = (text: string) =>
+    text
+      .split(/[\r\n,;|]+/)
+      .map(normalizeToken)
+      .filter((s) => s && !s.startsWith("#"));
+
   const loadPaste = () => {
-    const tokens = paste
-      .split(/[\s,;\n]+/)
-      .map((s) => s.trim().toUpperCase().replace(/\s+/g, "_"))
-      .filter(Boolean);
+    const tokens = parseTokens(paste);
     if (tokens.length) {
       setDataset({
         id: "CUSTOM",
@@ -249,10 +244,7 @@ function ImportPanel({
     const reader = new FileReader();
     reader.onload = () => {
       const text = String(reader.result ?? "");
-      const tokens = text
-        .split(/[\r\n,;]+/)
-        .map((s) => s.trim().toUpperCase().replace(/\s+/g, "_"))
-        .filter((s) => s && !s.startsWith("#"));
+      const tokens = parseTokens(text);
       if (tokens.length) {
         setDataset({
           id: "CSV",
@@ -267,21 +259,56 @@ function ImportPanel({
     reader.readAsText(f);
   };
 
+  const sampleRandom = async () => {
+    setRandLoading(true);
+    setRandError(null);
+    try {
+      const prefix = randPrefix ? parseTokens(randPrefix) : [];
+      const r = await api.generate({ prefix, temperature });
+      setDataset({
+        id: "RANDOM",
+        family: "Model Sample",
+        node: `T=${temperature.toFixed(2)}`,
+        description: `${r.full.length}-step random sample · ${
+          r.is_valid ? "VALID" : "INVALID"
+        }`,
+        steps: r.full,
+      });
+      setSteps(r.full);
+    } catch (e) {
+      setRandError(String(e));
+    } finally {
+      setRandLoading(false);
+    }
+  };
+
   return (
     <Panel
       title="Step 01 · Import Data"
-      meta={<span className="flex items-center gap-2"><StatusDot color="info" /> source: {dataset.id}</span>}
+      meta={
+        <span className="flex items-center gap-2">
+          <StatusDot color="info" /> source: {dataset.id}
+        </span>
+      }
     >
-      <div className="grid grid-cols-3 border border-border mb-4">
-        {(["demo", "paste", "upload"] as const).map((m) => (
+      <div className="grid grid-cols-4 border border-border mb-4">
+        {(["demo", "paste", "upload", "random"] as const).map((m) => (
           <button
             key={m}
             onClick={() => setMode(m)}
-            className={`px-3 py-2 font-mono text-tiny uppercase tracking-widest border-r border-border last:border-r-0 ${
-              mode === m ? "bg-foreground text-background" : "bg-card hover:bg-surface"
+            className={`px-2 py-2 font-mono text-tiny uppercase tracking-widest border-r border-border last:border-r-0 ${
+              mode === m
+                ? "bg-foreground text-background"
+                : "bg-card hover:bg-surface"
             }`}
           >
-            {m === "demo" ? "Demo Dataset" : m === "paste" ? "Paste Steps" : "Upload CSV"}
+            {m === "demo"
+              ? "Demo"
+              : m === "paste"
+                ? "Paste"
+                : m === "upload"
+                  ? "CSV"
+                  : "Random"}
           </button>
         ))}
       </div>
@@ -309,8 +336,17 @@ function ImportPanel({
                     {d.steps.length} steps
                   </span>
                 </div>
-                <div className="mt-1 text-tiny font-mono text-muted-foreground">{d.family}</div>
-                <div className="text-tiny font-mono text-muted-foreground">{d.node}</div>
+                <div className="mt-1 text-tiny font-mono text-muted-foreground">
+                  {d.family}
+                </div>
+                <div className="text-tiny font-mono text-muted-foreground">
+                  {d.node}
+                </div>
+                {d.id === "OOD" && (
+                  <div className="mt-2 text-tiny font-mono text-[var(--warning)]">
+                    ⚠ demo only — most tokens not in trained vocab
+                  </div>
+                )}
               </button>
             );
           })}
@@ -323,7 +359,7 @@ function ImportPanel({
             value={paste}
             onChange={(e) => setPaste(e.target.value)}
             rows={6}
-            placeholder={"RECEIVE_WAFER\nRCA_CLEAN\nTHERMAL_OXIDATION\n…"}
+            placeholder={"RECEIVE WAFER\nRCA CLEAN\nGROW THERMAL OXIDE\n…"}
             className="w-full bg-background border border-border p-2 font-mono text-xs"
           />
           <button
@@ -351,15 +387,65 @@ function ImportPanel({
             ⬆ Drop CSV / TXT · one step per line
           </button>
           <div className="text-tiny font-mono text-muted-foreground">
-            Accepts comma, newline, or semicolon-separated tokens.
+            Accepts comma, newline, semicolon, or `|` separators.
           </div>
+        </div>
+      )}
+
+      {mode === "random" && (
+        <div className="space-y-3">
+          <div>
+            <div className="flex items-center justify-between">
+              <Label>Temperature</Label>
+              <span className="font-mono text-xs tabular">
+                {temperature.toFixed(2)}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0.4}
+              max={1.4}
+              step={0.05}
+              value={temperature}
+              onChange={(e) => setTemperature(parseFloat(e.target.value))}
+              className="w-full mt-1"
+            />
+            <div className="flex justify-between text-tiny font-mono text-muted-foreground mt-0.5">
+              <span>0.40 · sharp</span>
+              <span>1.40 · creative</span>
+            </div>
+          </div>
+          <div>
+            <Label>Starting prefix (optional)</Label>
+            <textarea
+              value={randPrefix}
+              onChange={(e) => setRandPrefix(e.target.value)}
+              rows={3}
+              placeholder={"RECEIVE WAFER\nRCA CLEAN"}
+              className="mt-1 w-full bg-background border border-border p-2 font-mono text-xs"
+            />
+          </div>
+          <button
+            onClick={sampleRandom}
+            disabled={randLoading}
+            className="w-full bg-foreground text-background font-mono text-xs uppercase tracking-widest py-2 hover:bg-[var(--info)] disabled:opacity-50"
+          >
+            {randLoading ? "● Sampling…" : "▶ Sample New Recipe"}
+          </button>
+          {randError && (
+            <div className="text-tiny font-mono text-destructive break-words">
+              {randError}
+            </div>
+          )}
         </div>
       )}
 
       <div className="mt-4 pt-3 border-t border-border">
         <Label>Active Recipe</Label>
         <div className="mt-1 font-mono text-xs">{dataset.family}</div>
-        <div className="text-tiny font-mono text-muted-foreground">{dataset.description}</div>
+        <div className="text-tiny font-mono text-muted-foreground">
+          {dataset.description}
+        </div>
       </div>
     </Panel>
   );
@@ -384,7 +470,8 @@ function SequenceExplorer({
       meta={
         <span className="flex items-center gap-2">
           <StatusDot color="success" />
-          {steps.length} steps · cursor @ {String(selected + 1).padStart(2, "0")}
+          {steps.length} steps · cursor @{" "}
+          {String(selected + 1).padStart(2, "0")}
         </span>
       }
     >
@@ -416,7 +503,9 @@ function SequenceExplorer({
                   <span className="font-mono text-tiny text-muted-foreground tabular">
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                  <span className={`font-mono text-xs ${active ? "text-foreground" : ""}`}>
+                  <span
+                    className={`font-mono text-xs ${active ? "text-foreground" : ""}`}
+                  >
                     {s}
                   </span>
                   <span className="text-right text-tiny font-mono uppercase tracking-widest text-muted-foreground">
@@ -436,7 +525,13 @@ function SequenceExplorer({
 /* Step 3 — Task Tabs                                           */
 /* ============================================================ */
 
-type TabId = "predict" | "complete" | "validate" | "anomaly" | "ood";
+type TabId =
+  | "predict"
+  | "complete"
+  | "validate"
+  | "anomaly"
+  | "ood"
+  | "batch";
 
 const TABS: { id: TabId; code: string; label: string }[] = [
   { id: "predict", code: "T1", label: "Predict Next Step" },
@@ -444,11 +539,12 @@ const TABS: { id: TabId; code: string; label: string }[] = [
   { id: "validate", code: "T3", label: "Validate Process" },
   { id: "anomaly", code: "T4", label: "Detect Anomalies" },
   { id: "ood", code: "T5", label: "OOD Analysis" },
+  { id: "batch", code: "T6", label: "Batch Eval (CSV)" },
 ];
 
 function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 border-y border-border-strong">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 border-y border-border-strong">
       {TABS.map((t) => {
         const active = tab === t.id;
         return (
@@ -460,7 +556,9 @@ function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
             }`}
           >
             <div className="flex items-center gap-2">
-              <span className="text-tiny font-mono text-muted-foreground">{t.code}</span>
+              <span className="text-tiny font-mono text-muted-foreground">
+                {t.code}
+              </span>
               <span
                 className={`text-tiny font-mono uppercase tracking-widest ${
                   active ? "text-[var(--info)]" : "text-foreground"
@@ -496,19 +594,37 @@ function PredictTab({
   cursor: number;
 }) {
   const prefix = steps.slice(0, cursor + 1);
-  const [results, setResults] = useState<{ token: string; prob: number }[]>([]);
+  const [results, setResults] = useState<Prediction[]>([]);
   const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [latency, setLatency] = useState<number | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     setRunning(true);
     setResults([]);
-    const t = setTimeout(() => {
-      setResults(predictTop5(prefix, dataset));
-      setRunning(false);
-    }, 420);
-    return () => clearTimeout(t);
+    setError(null);
+    api
+      .predictNextStep(prefix, 5)
+      .then((r) => {
+        if (cancelled) return;
+        setResults(r.predictions);
+        setLatency(r.latency_ms);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setRunning(false);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cursor, dataset.id, steps.length]);
+  }, [cursor, steps.join("|")]);
+
+  const trueNext = dataset.steps[cursor + 1] ?? null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -545,38 +661,74 @@ function PredictTab({
       </div>
 
       <div className="lg:col-span-3">
-        <Panel title="Top-5 Predicted Steps" meta={running ? "computing" : "READY"}>
+        <Panel
+          title="Top-5 Predicted Steps"
+          meta={
+            error
+              ? "ERROR"
+              : running
+                ? "computing"
+                : latency != null
+                  ? `READY · ${latency.toFixed(0)} ms`
+                  : "READY"
+          }
+        >
           <div className="space-y-2 min-h-[260px]">
-            {results.length === 0 && (
+            {error && (
+              <div className="text-tiny font-mono text-destructive break-words">
+                backend error · {error}
+              </div>
+            )}
+            {!error && results.length === 0 && (
               <div className="text-tiny font-mono text-muted-foreground pulse-dot">
                 sampling distribution…
               </div>
             )}
-            {results.map((r, i) => (
-              <motion.div
-                key={r.token}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.06 }}
-                className="grid grid-cols-12 items-center gap-3"
-              >
-                <div className="col-span-1 font-mono text-tiny text-muted-foreground">
-                  #{i + 1}
-                </div>
-                <div className="col-span-4 font-mono text-xs">{r.token}</div>
-                <div className="col-span-5 h-6 bg-background border border-border relative overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${r.prob * 100}%` }}
-                    transition={{ duration: 0.6, delay: i * 0.06, ease: "easeOut" }}
-                    className={`h-full ${i === 0 ? "bg-[var(--info)]" : "bg-[var(--info)]/40"}`}
-                  />
-                </div>
-                <div className="col-span-2 text-right font-mono text-xs tabular">
-                  {(r.prob * 100).toFixed(1)}%
-                </div>
-              </motion.div>
-            ))}
+            {results.map((r, i) => {
+              const isTrue = trueNext && r.token === trueNext;
+              return (
+                <motion.div
+                  key={`${r.token}-${i}`}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.06 }}
+                  className="grid grid-cols-12 items-center gap-3"
+                >
+                  <div className="col-span-1 font-mono text-tiny text-muted-foreground">
+                    #{i + 1}
+                  </div>
+                  <div
+                    className={`col-span-4 font-mono text-xs ${
+                      isTrue ? "text-[var(--success)] font-semibold" : ""
+                    }`}
+                  >
+                    {r.token}
+                    {isTrue && (
+                      <span className="ml-1 text-tiny text-[var(--success)]">
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  <div className="col-span-5 h-6 bg-background border border-border relative overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${r.prob * 100}%` }}
+                      transition={{
+                        duration: 0.6,
+                        delay: i * 0.06,
+                        ease: "easeOut",
+                      }}
+                      className={`h-full ${
+                        i === 0 ? "bg-[var(--info)]" : "bg-[var(--info)]/40"
+                      }`}
+                    />
+                  </div>
+                  <div className="col-span-2 text-right font-mono text-xs tabular">
+                    {(r.prob * 100).toFixed(1)}%
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         </Panel>
       </div>
@@ -600,37 +752,54 @@ function CompleteTab({
   const prefix = steps.slice(0, cursor + 1);
   const [out, setOut] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [latency, setLatency] = useState<number | null>(null);
+  const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelled = useRef(false);
 
   const stop = () => {
-    if (timer.current) clearTimeout(timer.current);
+    if (revealTimer.current) clearTimeout(revealTimer.current);
+    cancelled.current = true;
     setRunning(false);
   };
   useEffect(() => () => stop(), []);
 
-  const run = () => {
-    stop();
-    setOut([]);
-    setRunning(true);
-    const target = Math.max(4, steps.length - prefix.length);
+  const reveal = (tokens: string[]) => {
     const buf: string[] = [];
-    const tick = (i: number) => {
-      if (i >= target) {
+    let i = 0;
+    const step = () => {
+      if (cancelled.current || i >= tokens.length) {
         setRunning(false);
         return;
       }
-      const next = predictTop5([...prefix, ...buf], dataset)[0];
-      buf.push(next.token);
+      buf.push(tokens[i]);
       setOut([...buf]);
-      timer.current = setTimeout(() => tick(i + 1), 260);
+      i += 1;
+      revealTimer.current = setTimeout(step, 180);
     };
-    timer.current = setTimeout(() => tick(0), 200);
+    step();
+  };
+
+  const run = async () => {
+    stop();
+    cancelled.current = false;
+    setOut([]);
+    setError(null);
+    setRunning(true);
+    try {
+      const r = await api.complete(prefix, { greedy: true });
+      setLatency(r.latency_ms);
+      reveal(r.generated);
+    } catch (e) {
+      setError(String(e));
+      setRunning(false);
+    }
   };
 
   useEffect(() => {
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cursor, dataset.id, steps.length]);
+  }, [cursor, dataset.id, steps.join("|")]);
 
   const all = [...prefix, ...out];
 
@@ -667,6 +836,16 @@ function CompleteTab({
               ■
             </button>
           </div>
+          {latency != null && !running && !error && (
+            <div className="mt-2 text-tiny font-mono text-muted-foreground">
+              backend · {latency.toFixed(0)} ms · {out.length} tokens
+            </div>
+          )}
+          {error && (
+            <div className="mt-2 text-tiny font-mono text-destructive break-words">
+              {error}
+            </div>
+          )}
         </Panel>
       </div>
 
@@ -716,7 +895,7 @@ function CompleteTab({
             })}
             {running && (
               <div className="font-mono text-tiny text-[var(--info)] pulse-dot pl-10 pt-1">
-                sampling next token…
+                streaming next token…
               </div>
             )}
           </div>
@@ -730,115 +909,57 @@ function CompleteTab({
 /* TAB 3 · Validate Process                                     */
 /* ============================================================ */
 
-type Rule = {
-  id: string;
-  label: string;
-  check: (seq: string[]) => { ok: boolean; offendingIdx?: number };
-};
-
-const VAL_RULES: Rule[] = [
-  {
-    id: "V-01",
-    label: "Clean Before Deposition",
-    check: (seq) => {
-      for (let i = 0; i < seq.length; i++) {
-        if (/DEPOSIT|EPI_|GATE_OXIDE/.test(seq[i])) {
-          const before = seq.slice(Math.max(0, i - 3), i);
-          if (!before.some((t) => /CLEAN|RCA|CMP/.test(t)))
-            return { ok: false, offendingIdx: i };
-        }
-      }
-      return { ok: true };
-    },
-  },
-  {
-    id: "V-02",
-    label: "Lithography Before Etch",
-    check: (seq) => {
-      for (let i = 0; i < seq.length; i++) {
-        if (/ETCH/.test(seq[i])) {
-          const before = seq.slice(0, i);
-          if (!before.some((t) => /EXPOSE|DEVELOP|LITHO|PHOTORESIST/.test(t)))
-            return { ok: false, offendingIdx: i };
-        }
-      }
-      return { ok: true };
-    },
-  },
-  {
-    id: "V-03",
-    label: "Implant Window Exists",
-    check: (seq) => {
-      for (let i = 0; i < seq.length; i++) {
-        if (/IMPLANT/.test(seq[i])) {
-          const after = seq.slice(i + 1, i + 5);
-          if (!after.some((t) => /ANNEAL|DRIVE/.test(t)))
-            return { ok: false, offendingIdx: i };
-        }
-      }
-      return { ok: true };
-    },
-  },
-  {
-    id: "V-04",
-    label: "CMP Has Material",
-    check: (seq) => {
-      for (let i = 0; i < seq.length; i++) {
-        if (/^CMP/.test(seq[i])) {
-          const before = seq.slice(Math.max(0, i - 4), i);
-          if (!before.some((t) => /FILL|DEPOSIT|METAL|OXIDE|CU|W_/.test(t)))
-            return { ok: false, offendingIdx: i };
-        }
-      }
-      return { ok: true };
-    },
-  },
-  {
-    id: "V-05",
-    label: "Test After Passivation",
-    check: (seq) => {
-      const pIdx = seq.findIndex((t) => /PASSIVATION/.test(t));
-      if (pIdx === -1) return { ok: true };
-      const after = seq.slice(pIdx + 1);
-      if (after.length === 0) return { ok: true };
-      if (!after.some((t) => /MEASURE|INSPECT|CD_/.test(t)))
-        return { ok: false, offendingIdx: pIdx };
-      return { ok: true };
-    },
-  },
-];
-
 function ValidateTab({ steps }: { steps: string[] }) {
-  const [results, setResults] = useState<
-    { id: string; ok: boolean | null; offendingIdx?: number }[]
+  const [allRules, setAllRules] = useState<
+    { id: string; description: string }[]
   >([]);
+  const [result, setResult] = useState<{
+    is_valid: number;
+    violations: Violation[];
+    n_steps: number;
+  } | null>(null);
   const [running, setRunning] = useState(false);
-
-  const run = () => {
-    setRunning(true);
-    setResults(VAL_RULES.map((r) => ({ id: r.id, ok: null })));
-    VAL_RULES.forEach((r, i) => {
-      setTimeout(() => {
-        const res = r.check(steps);
-        setResults((prev) =>
-          prev.map((p) =>
-            p.id === r.id ? { id: r.id, ok: res.ok, offendingIdx: res.offendingIdx } : p,
-          ),
-        );
-        if (i === VAL_RULES.length - 1) setRunning(false);
-      }, 180 * (i + 1));
-    });
-  };
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [steps.length, steps.join("|")]);
+    api
+      .rules()
+      .then((r) => setAllRules(r.rules))
+      .catch(() => setAllRules([]));
+  }, []);
 
-  const failed = results.filter((r) => r.ok === false);
-  const done = results.every((r) => r.ok !== null);
-  const verdict = !done ? "pending" : failed.length === 0 ? "VALID" : "INVALID";
-  const offenders = new Set(failed.map((f) => f.offendingIdx).filter((x) => x != null));
+  useEffect(() => {
+    let cancelled = false;
+    setRunning(true);
+    setResult(null);
+    setError(null);
+    api
+      .validate(steps)
+      .then((r) => {
+        if (!cancelled) setResult(r);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setRunning(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [steps]);
+
+  const failedIds = new Set(result?.violations.map((v) => v.rule) ?? []);
+  const offenders = new Set(
+    result?.violations.map((v) => v.step_index).filter((x) => x != null) ?? [],
+  );
+  const verdict = running
+    ? "pending"
+    : !result
+      ? "pending"
+      : result.is_valid
+        ? "VALID"
+        : "INVALID";
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -870,28 +991,37 @@ function ValidateTab({ steps }: { steps: string[] }) {
             {verdict}
           </div>
           <div className="mt-2 font-mono text-tiny text-muted-foreground">
-            {results.filter((r) => r.ok === true).length}/{VAL_RULES.length} rules satisfied
+            {result
+              ? `${allRules.length - failedIds.size}/${allRules.length || "?"} rules satisfied · ${result.n_steps} steps`
+              : "awaiting backend…"}
           </div>
         </motion.div>
 
         <Panel title="Rule Trace">
           <div className="space-y-2">
-            {VAL_RULES.map((r) => {
-              const s = results.find((x) => x.id === r.id);
+            {allRules.length === 0 && !running && (
+              <div className="font-mono text-tiny text-muted-foreground">
+                no rules loaded
+              </div>
+            )}
+            {allRules.map((r) => {
+              const failed = failedIds.has(r.id);
               return (
                 <div
                   key={r.id}
-                  className="grid grid-cols-[40px_1fr_60px] gap-2 items-center"
+                  className="grid grid-cols-[60px_1fr_60px] gap-2 items-center"
                 >
-                  <span className="font-mono text-tiny text-muted-foreground">{r.id}</span>
-                  <span className="text-xs">{r.label}</span>
+                  <span className="font-mono text-tiny text-muted-foreground">
+                    {r.id}
+                  </span>
+                  <span className="text-xs">{r.description}</span>
                   <span className="text-right font-mono text-tiny uppercase">
-                    {s?.ok == null ? (
+                    {running || !result ? (
                       <span className="text-muted-foreground pulse-dot">…</span>
-                    ) : s.ok ? (
-                      <span className="text-[var(--success)]">✓ pass</span>
-                    ) : (
+                    ) : failed ? (
                       <span className="text-destructive">✗ fail</span>
+                    ) : (
+                      <span className="text-[var(--success)]">✓ pass</span>
                     )}
                   </span>
                 </div>
@@ -903,6 +1033,11 @@ function ValidateTab({ steps }: { steps: string[] }) {
 
       <div className="lg:col-span-3 space-y-4">
         <Panel title="Highlighted Sequence">
+          {error && (
+            <div className="mb-2 text-tiny font-mono text-destructive break-words">
+              backend error · {error}
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5">
             {steps.map((tok, i) => {
               const bad = offenders.has(i);
@@ -925,29 +1060,25 @@ function ValidateTab({ steps }: { steps: string[] }) {
           </div>
         </Panel>
 
-        {failed.length > 0 && done && (
+        {result && result.violations.length > 0 && (
           <Panel title="Violations">
             <div className="space-y-2">
-              {failed.map((f) => {
-                const rule = VAL_RULES.find((r) => r.id === f.id)!;
-                return (
-                  <div
-                    key={f.id}
-                    className="border border-destructive bg-destructive/5 p-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs text-destructive">
-                        {f.id} · {rule.label}
-                      </span>
-                      {f.offendingIdx != null && (
-                        <span className="font-mono text-tiny text-destructive">
-                          step {String(f.offendingIdx + 1).padStart(2, "0")} · {steps[f.offendingIdx]}
-                        </span>
-                      )}
-                    </div>
+              {result.violations.map((v, i) => (
+                <div
+                  key={`${v.rule}-${i}`}
+                  className="border border-destructive bg-destructive/5 p-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs text-destructive">
+                      {v.rule} · {v.description}
+                    </span>
+                    <span className="font-mono text-tiny text-destructive">
+                      step {String(v.step_index + 1).padStart(2, "0")} ·{" "}
+                      {v.step_name}
+                    </span>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </Panel>
         )}
@@ -960,136 +1091,275 @@ function ValidateTab({ steps }: { steps: string[] }) {
 /* TAB 4 · Anomaly Detection                                    */
 /* ============================================================ */
 
-function AnomalyTab({ dataset, steps }: { dataset: Dataset; steps: string[] }) {
-  const [scores, setScores] = useState<number[]>([]);
+function AnomalyTab({ steps }: { steps: string[] }) {
+  const [result, setResult] = useState<AnomalyResult | null>(null);
   const [running, setRunning] = useState(false);
-
-  const run = () => {
-    setRunning(true);
-    setScores([]);
-    const buf: number[] = [];
-    steps.forEach((tok, i) => {
-      setTimeout(() => {
-        const rand = seededRand(tok.charCodeAt(0) * 31 + i * 7 + dataset.id.length);
-        let s = rand() * 0.35;
-        const prev = steps[i - 1] ?? "";
-        // generate higher score for unusual adjacencies
-        if (/ETCH/.test(prev) && /METAL_DEP/.test(tok)) s += 0.55;
-        if (/IMPLANT/.test(prev) && !/ANNEAL|DRIVE/.test(tok)) s += 0.35;
-        if (/2D_|GRAPHENE|FERRO|CRYO|PHOTONIC/.test(tok)) s += 0.45;
-        buf[i] = Math.min(0.98, s);
-        setScores([...buf]);
-        if (i === steps.length - 1) setRunning(false);
-      }, 110 * (i + 1));
-    });
-  };
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [steps.join("|"), dataset.id]);
+    let cancelled = false;
+    setRunning(true);
+    setResult(null);
+    setError(null);
+    api
+      .anomaly(steps, true)
+      .then((r) => {
+        if (!cancelled) setResult(r);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setRunning(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [steps]);
 
-  const heat = (v: number) => {
-    if (v < 0.2) return "bg-[var(--success)]/15 border-[var(--success)]/40";
-    if (v < 0.45) return "bg-[var(--info)]/15 border-[var(--info)]/50";
-    if (v < 0.7) return "bg-[var(--warning)]/20 border-[var(--warning)]/60";
-    return "bg-destructive/25 border-destructive/70";
-  };
-  const sev = (v: number) =>
-    v < 0.2 ? "low" : v < 0.45 ? "nominal" : v < 0.7 ? "warning" : "critical";
+  const offenders = new Set(
+    result?.violations.map((v) => v.step_index).filter((x) => x != null) ?? [],
+  );
 
-  const max = scores.length ? Math.max(...scores) : 0;
-  const maxIdx = scores.indexOf(max);
+  const verdict = result ? (result.is_valid ? "NORMAL" : "ANOMALY") : null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
       <div className="lg:col-span-2 space-y-4">
-        <Panel title="Anomaly Summary">
+        <motion.div
+          key={verdict ?? "loading"}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`border p-5 ${
+            verdict === "NORMAL"
+              ? "border-[var(--success)] bg-[var(--success)]/5"
+              : verdict === "ANOMALY"
+                ? "border-destructive bg-destructive/5"
+                : "border-border-strong"
+          }`}
+        >
+          <div className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+            Anomaly Verdict
+          </div>
+          <div
+            className={`mt-1 font-serif text-5xl ${
+              verdict === "NORMAL"
+                ? "text-[var(--success)]"
+                : verdict === "ANOMALY"
+                  ? "text-destructive"
+                  : "text-muted-foreground"
+            }`}
+          >
+            {verdict ?? "…"}
+          </div>
+          <div className="mt-2 font-mono text-tiny text-muted-foreground">
+            {result
+              ? `confidence ${(result.score * 100).toFixed(0)}%`
+              : running
+                ? "running detector…"
+                : ""}
+          </div>
+        </motion.div>
+
+        <Panel title="Diagnostics">
           <div className="grid grid-cols-3 gap-2">
             <div className="border border-border p-2">
-              <Label>Max Score</Label>
-              <div className="font-mono text-2xl tabular text-destructive">
-                {(max * 100).toFixed(0)}%
+              <Label>NLL</Label>
+              <div className="font-mono text-xl tabular mt-1">
+                {result ? result.nll.toFixed(3) : "—"}
               </div>
             </div>
             <div className="border border-border p-2">
-              <Label>Location</Label>
-              <div className="font-mono text-2xl tabular">
-                {maxIdx >= 0 ? String(maxIdx + 1).padStart(2, "0") : "—"}
+              <Label>Threshold</Label>
+              <div className="font-mono text-xl tabular mt-1">
+                {result?.threshold != null
+                  ? result.threshold.toFixed(3)
+                  : "—"}
               </div>
             </div>
             <div className="border border-border p-2">
-              <Label>Severity</Label>
-              <div className="font-mono text-xs uppercase mt-2">{sev(max)}</div>
+              <Label>LM-only</Label>
+              <div className="font-mono text-xs uppercase mt-2">
+                {result
+                  ? result.lm_only.is_valid
+                    ? "normal"
+                    : "anomaly"
+                  : "—"}
+              </div>
             </div>
           </div>
-        </Panel>
-
-        <Panel title="Suspicious Steps">
-          <div className="space-y-1">
-            {scores
-              .map((s, i) => ({ s, i }))
-              .filter((x) => x.s > 0.5)
-              .sort((a, b) => b.s - a.s)
-              .slice(0, 6)
-              .map((x) => (
-                <div
-                  key={x.i}
-                  className="grid grid-cols-[40px_1fr_60px] items-center gap-2 border-l-2 border-destructive pl-2 py-1"
-                >
-                  <span className="font-mono text-tiny text-muted-foreground">
-                    {String(x.i + 1).padStart(2, "0")}
-                  </span>
-                  <span className="font-mono text-xs">{steps[x.i]}</span>
-                  <span className="font-mono text-tiny text-destructive text-right tabular">
-                    {(x.s * 100).toFixed(0)}%
-                  </span>
-                </div>
-              ))}
-            {scores.filter((s) => s > 0.5).length === 0 && !running && (
-              <div className="font-mono text-tiny text-muted-foreground">
-                No anomalies above threshold.
-              </div>
-            )}
-          </div>
+          {result?.predicted_rule && (
+            <div className="mt-3 text-tiny font-mono text-muted-foreground">
+              predicted rule · {result.predicted_rule}
+            </div>
+          )}
         </Panel>
       </div>
 
-      <div className="lg:col-span-3">
-        <Panel title="Per-Step Heatmap" meta={running ? "scanning" : "complete"}>
-          <div
-            className="grid gap-1"
-            style={{
-              gridTemplateColumns: `repeat(${Math.min(steps.length, 12)}, minmax(0, 1fr))`,
-            }}
-          >
+      <div className="lg:col-span-3 space-y-4">
+        <Panel
+          title="Sequence · Violations Highlighted"
+          meta={running ? "scanning" : "complete"}
+        >
+          {error && (
+            <div className="mb-2 text-tiny font-mono text-destructive break-words">
+              backend error · {error}
+            </div>
+          )}
+          <div className="flex flex-wrap gap-1.5">
             {steps.map((tok, i) => {
-              const v = scores[i] ?? 0;
+              const bad = offenders.has(i);
               return (
-                <motion.div
-                  key={`${tok}-${i}`}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: i * 0.03 }}
-                  title={`${tok} · ${(v * 100).toFixed(0)}%`}
-                  className={`border ${heat(v)} aspect-square min-h-[48px] flex flex-col items-center justify-center p-1`}
+                <span
+                  key={i}
+                  className={`font-mono text-xs px-2 py-1 border ${
+                    bad
+                      ? "border-destructive bg-destructive/10 text-destructive"
+                      : "border-border bg-card"
+                  }`}
                 >
-                  <div className="font-mono text-tiny text-muted-foreground">
+                  <span className="text-muted-foreground mr-1">
                     {String(i + 1).padStart(2, "0")}
-                  </div>
-                  <div className="font-mono text-xs tabular">{(v * 100).toFixed(0)}</div>
-                </motion.div>
+                  </span>
+                  {tok}
+                </span>
               );
             })}
           </div>
-
-          <div className="mt-4 flex items-center gap-3 text-tiny font-mono text-muted-foreground">
-            <span>0%</span>
-            <div className="flex-1 h-2 bg-gradient-to-r from-[var(--success)] via-[var(--info)] via-[var(--warning)] to-destructive" />
-            <span>100% anomaly</span>
-          </div>
         </Panel>
+
+        {result && result.violations.length > 0 && (
+          <Panel title="Violations">
+            <div className="space-y-2">
+              {result.violations.map((v, i) => (
+                <div
+                  key={`${v.rule}-${i}`}
+                  className="border border-destructive bg-destructive/5 p-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs text-destructive">
+                      {v.rule} · {v.description}
+                    </span>
+                    <span className="font-mono text-tiny text-destructive">
+                      step {String(v.step_index + 1).padStart(2, "0")} ·{" "}
+                      {v.step_name}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        )}
       </div>
+    </div>
+  );
+}
+
+/* ============================================================ */
+/* Metrics table — shared by OOD and Batch tabs                 */
+/* ============================================================ */
+
+type Task = "nextstep" | "completion" | "anomaly";
+
+const METRIC_COLUMNS: Record<Task, { key: string; label: string }[]> = {
+  nextstep: [
+    { key: "top1", label: "Top-1" },
+    { key: "top3", label: "Top-3" },
+    { key: "top5", label: "Top-5" },
+    { key: "mrr", label: "MRR" },
+    { key: "n", label: "N" },
+  ],
+  completion: [
+    { key: "exact_match", label: "Exact" },
+    { key: "norm_edit_dist", label: "NED" },
+    { key: "token_acc", label: "Token Acc" },
+    { key: "n", label: "N" },
+  ],
+  anomaly: [
+    { key: "acc", label: "Acc" },
+    { key: "precision", label: "Prec" },
+    { key: "recall", label: "Recall" },
+    { key: "f1", label: "F1" },
+    { key: "roc_auc", label: "ROC-AUC" },
+    { key: "rule_attr", label: "Rule Attr" },
+    { key: "n", label: "N" },
+  ],
+};
+
+function MetricsTable({
+  task,
+  metrics,
+}: {
+  task: Task;
+  metrics: Record<string, Record<string, number>> | null;
+}) {
+  const cols = METRIC_COLUMNS[task];
+  if (!metrics) {
+    return (
+      <div className="font-mono text-tiny text-muted-foreground">
+        no metrics available
+      </div>
+    );
+  }
+  const familyKeys = Object.keys(metrics);
+  const ordered = [
+    ...familyKeys.filter((k) => k.toUpperCase() === "ALL"),
+    ...familyKeys.filter((k) => k.toUpperCase() !== "ALL"),
+  ];
+
+  return (
+    <div className="border border-border overflow-auto">
+      <div
+        className="grid gap-2 px-3 py-2 border-b border-border bg-surface text-tiny font-mono uppercase text-muted-foreground"
+        style={{
+          gridTemplateColumns: `1fr ${cols.map(() => "80px").join(" ")}`,
+        }}
+      >
+        <span>Family</span>
+        {cols.map((c) => (
+          <span key={c.key} className="text-right">
+            {c.label}
+          </span>
+        ))}
+      </div>
+      {ordered.map((fam, i) => {
+        const row = metrics[fam] ?? {};
+        const isAll = fam.toUpperCase() === "ALL";
+        return (
+          <div
+            key={fam}
+            className={`grid gap-2 px-3 py-2 items-center ${
+              i !== ordered.length - 1 ? "border-b border-border" : ""
+            } ${isAll ? "bg-accent/50" : ""}`}
+            style={{
+              gridTemplateColumns: `1fr ${cols.map(() => "80px").join(" ")}`,
+            }}
+          >
+            <span
+              className={`font-mono text-xs ${isAll ? "text-[var(--info)] font-semibold" : ""}`}
+            >
+              {fam}
+            </span>
+            {cols.map((c) => {
+              const v = row[c.key];
+              const display =
+                v == null
+                  ? "—"
+                  : c.key === "n"
+                    ? Math.round(v).toString()
+                    : v.toFixed(3);
+              return (
+                <span
+                  key={c.key}
+                  className="font-mono text-xs tabular text-right"
+                >
+                  {display}
+                </span>
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1099,106 +1369,112 @@ function AnomalyTab({ dataset, steps }: { dataset: Dataset; steps: string[] }) {
 /* ============================================================ */
 
 function OODTab() {
-  const data = useMemo(
-    () => ({
-      training: ["MOSFET", "IGBT"],
-      testing: "IC",
-      metrics: { top1: 73.8, top5: 96.4, mrr: 0.812 },
-      perFamily: [
-        { name: "MOSFET", top1: 92.1, top5: 100, mrr: 0.956, role: "train" },
-        { name: "IGBT", top1: 88.4, top5: 99.2, mrr: 0.921, role: "train" },
-        { name: "IC", top1: 73.8, top5: 96.4, mrr: 0.812, role: "test" },
-        { name: "OOD-Novel", top1: 41.2, top5: 78.9, mrr: 0.527, role: "ood" },
-      ],
-    }),
-    [],
-  );
+  const [task, setTask] = useState<Task>("nextstep");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<OODEval | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const onFile = (f: File | null) => {
+    if (!f) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    api
+      .evalOOD(f, task)
+      .then(setResult)
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
       <div className="lg:col-span-2 space-y-4">
-        <Panel title="Training Manifest">
-          <Label>Training Families</Label>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {data.training.map((t) => (
-              <span
-                key={t}
-                className="font-mono text-xs px-2 py-1 border border-[var(--success)]/60 bg-[var(--success)]/10 text-[var(--success)]"
-              >
-                ✓ {t}
-              </span>
-            ))}
+        <Panel title="Held-Out Evaluation">
+          <div className="text-tiny font-mono text-muted-foreground leading-relaxed">
+            Upload an OOD evaluation CSV. The backend scores per-family and
+            returns an `ALL` row plus per-family breakdown. Use the same CSV
+            schema as Batch Eval for the chosen task.
           </div>
-          <div className="mt-4">
-            <Label>Held-Out Test Family</Label>
-            <div className="mt-2">
-              <span className="font-mono text-xs px-2 py-1 border border-[var(--info)] bg-accent text-[var(--info)]">
-                ◆ {data.testing}
-              </span>
-            </div>
-          </div>
-          <div className="mt-4 text-tiny font-mono text-muted-foreground">
-            Model is evaluated on a process family it has never observed during
-            training, measuring grammar transfer across device topologies.
+          <div className="mt-3 space-y-2">
+            <Label>Task</Label>
+            <select
+              value={task}
+              onChange={(e) => setTask(e.target.value as Task)}
+              className="w-full bg-background border border-border font-mono text-xs px-2 py-2"
+            >
+              <option value="nextstep">Next-step</option>
+              <option value="completion">Completion</option>
+              <option value="anomaly">Anomaly</option>
+            </select>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv"
+              onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={loading}
+              className="w-full border border-dashed border-border-strong bg-card hover:bg-surface py-6 font-mono text-xs uppercase tracking-widest disabled:opacity-50"
+            >
+              {loading ? "● scoring…" : "⬆ Upload OOD CSV"}
+            </button>
+            {error && (
+              <div className="text-tiny font-mono text-destructive break-words">
+                {error}
+              </div>
+            )}
           </div>
         </Panel>
+
+        {result && (
+          <Panel title="Family Counts">
+            <div className="space-y-1">
+              {Object.entries(result.family_counts).map(([k, v]) => (
+                <div
+                  key={k}
+                  className="grid grid-cols-[1fr_60px] font-mono text-xs"
+                >
+                  <span>{k}</span>
+                  <span className="text-right tabular text-muted-foreground">
+                    {v}
+                  </span>
+                </div>
+              ))}
+              <div className="mt-2 pt-2 border-t border-border grid grid-cols-[1fr_60px] font-mono text-xs">
+                <span className="text-[var(--info)]">TOTAL</span>
+                <span className="text-right tabular">{result.n}</span>
+              </div>
+            </div>
+          </Panel>
+        )}
       </div>
 
       <div className="lg:col-span-3 space-y-4">
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { label: "Top-1 Accuracy", value: data.metrics.top1, suffix: "%" },
-            { label: "Top-5 Accuracy", value: data.metrics.top5, suffix: "%" },
-            { label: "MRR", value: data.metrics.mrr * 1000, suffix: "" },
-          ].map((m, i) => (
-            <motion.div
-              key={m.label}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="border border-border-strong bg-card p-4"
-            >
-              <Label>{m.label}</Label>
-              <div className="font-mono text-4xl tabular mt-1 text-[var(--info)]">
-                {m.suffix === "%" ? m.value.toFixed(1) : (m.value / 1000).toFixed(3)}
-                <span className="text-base text-muted-foreground">{m.suffix}</span>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        <Panel title="Per-Family Performance">
-          <div className="border border-border">
-            <div className="grid grid-cols-[1fr_80px_80px_80px_80px] gap-2 px-3 py-2 border-b border-border bg-surface text-tiny font-mono uppercase text-muted-foreground">
-              <span>Family</span>
-              <span className="text-right">Role</span>
-              <span className="text-right">Top-1</span>
-              <span className="text-right">Top-5</span>
-              <span className="text-right">MRR</span>
+        <Panel title="Per-Family Metrics" meta={result ? `n=${result.n}` : ""}>
+          {!result && !loading && (
+            <div className="font-mono text-tiny text-muted-foreground">
+              upload a CSV to compute metrics.
             </div>
-            {data.perFamily.map((f, i) => (
-              <div
-                key={f.name}
-                className={`grid grid-cols-[1fr_80px_80px_80px_80px] gap-2 px-3 py-2 items-center ${
-                  i !== data.perFamily.length - 1 ? "border-b border-border" : ""
-                }`}
-              >
-                <span className="font-mono text-xs">{f.name}</span>
-                <span className="text-right font-mono text-tiny uppercase">
-                  {f.role === "train" ? (
-                    <span className="text-[var(--success)]">train</span>
-                  ) : f.role === "test" ? (
-                    <span className="text-[var(--info)]">test</span>
-                  ) : (
-                    <span className="text-[var(--warning)]">ood</span>
-                  )}
-                </span>
-                <span className="font-mono text-xs tabular text-right">{f.top1.toFixed(1)}</span>
-                <span className="font-mono text-xs tabular text-right">{f.top5.toFixed(1)}</span>
-                <span className="font-mono text-xs tabular text-right">{f.mrr.toFixed(3)}</span>
-              </div>
-            ))}
-          </div>
+          )}
+          {loading && (
+            <div className="font-mono text-tiny text-[var(--info)] pulse-dot">
+              evaluating…
+            </div>
+          )}
+          {result && (
+            <MetricsTable
+              task={task}
+              metrics={
+                result.metrics as unknown as Record<
+                  string,
+                  Record<string, number>
+                > | null
+              }
+            />
+          )}
         </Panel>
       </div>
     </div>
@@ -1206,19 +1482,494 @@ function OODTab() {
 }
 
 /* ============================================================ */
+/* TAB 6 · Batch Eval (CSV)                                     */
+/* ============================================================ */
+
+type BatchResult =
+  | { task: "nextstep"; data: NextStepEval }
+  | { task: "completion"; data: CompletionEval }
+  | { task: "anomaly"; data: AnomalyEval };
+
+function csvEscape(v: string): string {
+  if (v.includes(",") || v.includes('"') || v.includes("\n")) {
+    return `"${v.replace(/"/g, '""')}"`;
+  }
+  return v;
+}
+
+function downloadCsv(filename: string, rows: string[][]) {
+  const text = rows.map((r) => r.map(csvEscape).join(",")).join("\n");
+  const blob = new Blob([text], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function nedFromTokens(a: string[], b: string[]): number {
+  // Levenshtein on tokens, normalized by max(len). Returns 0..1.
+  const m = a.length;
+  const n = b.length;
+  if (!m && !n) return 0;
+  if (!m || !n) return 1;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost,
+      );
+    }
+  }
+  return dp[m][n] / Math.max(m, n);
+}
+
+function BatchEvalTab() {
+  const [task, setTask] = useState<Task>("nextstep");
+  const [loading, setLoading] = useState(false);
+  const [elapsed, setElapsed] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<BatchResult | null>(null);
+  const [page, setPage] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const PAGE_SIZE = 50;
+
+  const onFile = async (f: File | null) => {
+    if (!f) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setPage(0);
+    setElapsed(null);
+    const t0 = Date.now();
+    try {
+      let res: BatchResult;
+      if (task === "nextstep") {
+        const data = await api.evalNextStep(f);
+        res = { task, data };
+      } else if (task === "completion") {
+        const data = await api.evalCompletion(f);
+        res = { task, data };
+      } else {
+        const data = await api.evalAnomaly(f);
+        res = { task, data };
+      }
+      setResult(res);
+      setElapsed(Date.now() - t0);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadPredictions = () => {
+    if (!result) return;
+    if (result.task === "nextstep") {
+      const header = [
+        "EXAMPLE_ID",
+        "FAMILY",
+        "PRED_1",
+        "PROB_1",
+        "PRED_2",
+        "PROB_2",
+        "PRED_3",
+        "PROB_3",
+        "PRED_4",
+        "PROB_4",
+        "PRED_5",
+        "PROB_5",
+      ];
+      const rows = result.data.rows.map((r) => {
+        const cells = [r.example_id, r.family];
+        for (let i = 0; i < 5; i++) {
+          const p = r.predictions[i];
+          cells.push(p?.token ?? "", p ? p.prob.toFixed(6) : "");
+        }
+        return cells;
+      });
+      downloadCsv("predictions_nextstep.csv", [header, ...rows]);
+    } else if (result.task === "completion") {
+      const header = ["EXAMPLE_ID", "FAMILY", "PREDICTED"];
+      const rows = result.data.rows.map((r) => [
+        r.example_id,
+        r.family,
+        r.predicted.join("|"),
+      ]);
+      downloadCsv("predictions_completion.csv", [header, ...rows]);
+    } else {
+      const header = [
+        "EXAMPLE_ID",
+        "FAMILY",
+        "IS_VALID",
+        "SCORE",
+        "PREDICTED_RULE",
+        "NLL",
+      ];
+      const rows = result.data.rows.map((r) => [
+        r.example_id,
+        r.family,
+        String(r.is_valid),
+        r.score.toFixed(6),
+        r.predicted_rule ?? "",
+        r.nll.toFixed(6),
+      ]);
+      downloadCsv("predictions_anomaly.csv", [header, ...rows]);
+    }
+  };
+
+  const rows = result?.data.rows ?? [];
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pageRows = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const perRowMs = elapsed != null && rows.length ? elapsed / rows.length : null;
+
+  const csvHelp = useMemo(
+    () => ({
+      nextstep:
+        "EXAMPLE_ID, FAMILY, PARTIAL_SEQUENCE  (+ optional TRUE_NEXT_STEP). SEQUENCE cells use `|` separators.",
+      completion:
+        "EXAMPLE_ID, FAMILY, PARTIAL_SEQUENCE  (+ optional TRUE_SUFFIX, COMPLETION_FRACTION). SEQUENCE cells use `|` separators.",
+      anomaly:
+        "EXAMPLE_ID, FAMILY, SEQUENCE  (+ optional IS_VALID, RULE_VIOLATED). SEQUENCE cells use `|` separators.",
+    }),
+    [],
+  );
+
+  return (
+    <div className="space-y-4">
+      <Panel
+        title="Batch Eval · Upload CSV"
+        meta={
+          loading
+            ? "running"
+            : result
+              ? `${result.data.n} rows · ${elapsed?.toFixed(0)} ms`
+              : "idle"
+        }
+      >
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-4">
+          <div className="space-y-3">
+            <Label>Task</Label>
+            <div className="grid grid-cols-3 border border-border">
+              {(["nextstep", "completion", "anomaly"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTask(t)}
+                  className={`px-2 py-2 font-mono text-tiny uppercase tracking-widest border-r border-border last:border-r-0 ${
+                    task === t
+                      ? "bg-foreground text-background"
+                      : "bg-card hover:bg-surface"
+                  }`}
+                >
+                  {t === "nextstep"
+                    ? "Next-step"
+                    : t === "completion"
+                      ? "Completion"
+                      : "Anomaly"}
+                </button>
+              ))}
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv"
+              onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={loading}
+              className="w-full border border-dashed border-border-strong bg-card hover:bg-surface py-6 font-mono text-xs uppercase tracking-widest disabled:opacity-50"
+            >
+              {loading ? "● evaluating…" : "⬆ Choose CSV"}
+            </button>
+            {result && (
+              <button
+                onClick={downloadPredictions}
+                className="w-full bg-foreground text-background font-mono text-xs uppercase tracking-widest py-2 hover:bg-[var(--info)]"
+              >
+                ⬇ Download predictions.csv
+              </button>
+            )}
+            {loading && (
+              <div className="h-1 bg-border relative overflow-hidden">
+                <motion.div
+                  animate={{ x: ["-100%", "100%"] }}
+                  transition={{ duration: 1.4, repeat: Infinity, ease: "linear" }}
+                  className="absolute inset-y-0 w-1/3 bg-[var(--info)]"
+                />
+              </div>
+            )}
+            {error && (
+              <div className="text-tiny font-mono text-destructive break-words">
+                {error}
+              </div>
+            )}
+          </div>
+          <div className="border border-border bg-card p-3">
+            <Label>Expected CSV columns · {task}</Label>
+            <div className="mt-1 font-mono text-tiny text-muted-foreground leading-relaxed">
+              {csvHelp[task]}
+            </div>
+          </div>
+        </div>
+      </Panel>
+
+      {result && (
+        <>
+          <Panel title="Per-Family Metrics" meta={`n=${result.data.n}`}>
+            <MetricsTable
+              task={result.task}
+              metrics={
+                result.data.metrics as unknown as Record<
+                  string,
+                  Record<string, number>
+                > | null
+              }
+            />
+          </Panel>
+
+          <Panel title="Latency">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="border border-border p-2">
+                <Label>Total</Label>
+                <div className="font-mono text-2xl tabular mt-1">
+                  {elapsed?.toFixed(0)} ms
+                </div>
+              </div>
+              <div className="border border-border p-2">
+                <Label>Per-row avg</Label>
+                <div className="font-mono text-2xl tabular mt-1">
+                  {perRowMs != null ? perRowMs.toFixed(1) + " ms" : "—"}
+                </div>
+              </div>
+              <div className="border border-border p-2">
+                <Label>Rows</Label>
+                <div className="font-mono text-2xl tabular mt-1">
+                  {rows.length}
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel
+            title="Per-Row Results"
+            meta={`page ${page + 1} / ${totalPages}`}
+          >
+            <div className="border border-border overflow-auto max-h-[460px]">
+              {result.task === "nextstep" && (
+                <PerRowNextStep rows={pageRows as NextStepEval["rows"]} />
+              )}
+              {result.task === "completion" && (
+                <PerRowCompletion rows={pageRows as CompletionEval["rows"]} />
+              )}
+              {result.task === "anomaly" && (
+                <PerRowAnomaly rows={pageRows as AnomalyEval["rows"]} />
+              )}
+            </div>
+            <div className="flex items-center justify-between mt-3 font-mono text-xs">
+              <button
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="px-3 py-1 border border-border disabled:opacity-30"
+              >
+                ← prev
+              </button>
+              <span className="text-muted-foreground">
+                rows {page * PAGE_SIZE + 1}–
+                {Math.min(rows.length, (page + 1) * PAGE_SIZE)} of {rows.length}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="px-3 py-1 border border-border disabled:opacity-30"
+              >
+                next →
+              </button>
+            </div>
+          </Panel>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PerRowNextStep({ rows }: { rows: NextStepEval["rows"] }) {
+  return (
+    <table className="w-full text-xs font-mono">
+      <thead className="bg-surface text-tiny uppercase text-muted-foreground">
+        <tr>
+          <th className="text-left px-3 py-2">Example</th>
+          <th className="text-left px-3 py-2">Family</th>
+          <th className="text-left px-3 py-2">Top-5 Predictions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={`${r.example_id}-${i}`} className="border-t border-border">
+            <td className="px-3 py-2 align-top">{r.example_id}</td>
+            <td className="px-3 py-2 align-top text-muted-foreground">
+              {r.family}
+            </td>
+            <td className="px-3 py-2">
+              <div className="flex flex-wrap gap-1">
+                {r.predictions.map((p, j) => {
+                  const hit = r.true_next_step && p.token === r.true_next_step;
+                  return (
+                    <span
+                      key={j}
+                      className={`px-1.5 py-0.5 border ${
+                        hit
+                          ? "border-[var(--success)] bg-[var(--success)]/10 text-[var(--success)]"
+                          : "border-border bg-card"
+                      }`}
+                    >
+                      {p.token}{" "}
+                      <span className="text-muted-foreground">
+                        {(p.prob * 100).toFixed(0)}%
+                      </span>
+                    </span>
+                  );
+                })}
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function PerRowCompletion({ rows }: { rows: CompletionEval["rows"] }) {
+  return (
+    <table className="w-full text-xs font-mono">
+      <thead className="bg-surface text-tiny uppercase text-muted-foreground">
+        <tr>
+          <th className="text-left px-3 py-2">Example</th>
+          <th className="text-left px-3 py-2">Family</th>
+          <th className="text-left px-3 py-2">Predicted</th>
+          <th className="text-left px-3 py-2">True suffix</th>
+          <th className="text-right px-3 py-2">NED</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => {
+          const ned = r.true_suffix
+            ? nedFromTokens(r.predicted, r.true_suffix)
+            : null;
+          return (
+            <tr key={`${r.example_id}-${i}`} className="border-t border-border">
+              <td className="px-3 py-2 align-top">{r.example_id}</td>
+              <td className="px-3 py-2 align-top text-muted-foreground">
+                {r.family}
+              </td>
+              <td className="px-3 py-2 align-top">{r.predicted.join(" › ")}</td>
+              <td className="px-3 py-2 align-top text-muted-foreground">
+                {r.true_suffix ? r.true_suffix.join(" › ") : "—"}
+              </td>
+              <td className="px-3 py-2 text-right tabular">
+                {ned != null ? ned.toFixed(3) : "—"}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function PerRowAnomaly({ rows }: { rows: AnomalyEval["rows"] }) {
+  return (
+    <table className="w-full text-xs font-mono">
+      <thead className="bg-surface text-tiny uppercase text-muted-foreground">
+        <tr>
+          <th className="text-left px-3 py-2">Example</th>
+          <th className="text-left px-3 py-2">Family</th>
+          <th className="text-center px-3 py-2">Valid</th>
+          <th className="text-right px-3 py-2">Score</th>
+          <th className="text-left px-3 py-2">Predicted Rule</th>
+          <th className="text-center px-3 py-2">True</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={`${r.example_id}-${i}`} className="border-t border-border">
+            <td className="px-3 py-2">{r.example_id}</td>
+            <td className="px-3 py-2 text-muted-foreground">{r.family}</td>
+            <td className="px-3 py-2 text-center">
+              {r.is_valid ? (
+                <span className="text-[var(--success)]">✓</span>
+              ) : (
+                <span className="text-destructive">✗</span>
+              )}
+            </td>
+            <td className="px-3 py-2 text-right tabular">
+              {r.score.toFixed(3)}
+            </td>
+            <td className="px-3 py-2 text-muted-foreground">
+              {r.predicted_rule || "—"}
+            </td>
+            <td className="px-3 py-2 text-center text-muted-foreground">
+              {r.true_is_valid == null ? (
+                "—"
+              ) : r.true_is_valid ? (
+                <span className="text-[var(--success)]">✓</span>
+              ) : (
+                <span className="text-destructive">✗</span>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/* ============================================================ */
 /* Container                                                    */
 /* ============================================================ */
+
+function basename(p: string | null | undefined): string {
+  if (!p) return "—";
+  const parts = p.split(/[\\/]/);
+  return parts[parts.length - 1] || p;
+}
 
 export function ProcessLab() {
   const [dataset, setDataset] = useState<Dataset>(DATASETS.MOSFET);
   const [steps, setSteps] = useState<string[]>(DATASETS.MOSFET.steps);
   const [selected, setSelected] = useState(4);
   const [tab, setTab] = useState<TabId>("predict");
+  const [health, setHealth] = useState<Health | null>(null);
+  const [healthError, setHealthError] = useState<string | null>(null);
 
-  // clamp selection when dataset changes
+  useEffect(() => {
+    api
+      .health()
+      .then(setHealth)
+      .catch((e) => setHealthError(String(e)));
+  }, []);
+
+  // clamp selection when steps change
   useEffect(() => {
     if (selected >= steps.length) setSelected(Math.max(0, steps.length - 1));
   }, [steps.length, selected]);
+
+  const healthOk = !!health?.ok;
+  const healthLabel = healthError
+    ? `BACKEND UNREACHABLE · ${healthError.slice(0, 60)}`
+    : !health
+      ? "CHECKING BACKEND…"
+      : healthOk
+        ? `READY · ${health.device} · vocab ${health.vocab_size}`
+        : `NO CHECKPOINT — ${health.load_error ?? "unknown"}`;
 
   return (
     <section className="px-4 md:px-6 lg:px-8 pt-10">
@@ -1236,11 +1987,26 @@ export function ProcessLab() {
             </span>
           </div>
           <div className="flex items-center gap-4 text-tiny font-mono text-muted-foreground">
+            <span className="flex items-center gap-2">
+              <StatusDot
+                color={
+                  healthError || (health && !healthOk) ? "warning" : "success"
+                }
+              />
+              <span
+                className={
+                  healthError || (health && !healthOk)
+                    ? "text-[var(--warning)]"
+                    : "text-[var(--success)]"
+                }
+              >
+                {healthLabel}
+              </span>
+            </span>
+            <span>·</span>
             <span>RECIPE {dataset.id}</span>
             <span>·</span>
             <span>{steps.length} steps</span>
-            <span>·</span>
-            <span className="text-[var(--success)]">READY</span>
           </div>
         </div>
 
@@ -1251,8 +2017,8 @@ export function ProcessLab() {
             </h2>
             <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
               Import a wafer recipe, walk the manufacturing pipeline, and drive
-              SiliconGPT across five inference tasks — prediction, completion,
-              validation, anomaly detection, and out-of-distribution analysis.
+              SiliconGPT across six inference tasks — prediction, completion,
+              validation, anomaly detection, OOD analysis, and batch evaluation.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-6 font-mono">
@@ -1268,15 +2034,33 @@ export function ProcessLab() {
             </div>
             <div>
               <Label>Checkpoint</Label>
-              <div className="text-sm mt-1 text-[var(--success)]">sgpt-v041-ep142</div>
+              <div
+                className={`text-sm mt-1 ${
+                  healthOk ? "text-[var(--success)]" : "text-muted-foreground"
+                }`}
+              >
+                {health?.ckpt_path
+                  ? basename(health.ckpt_path)
+                  : healthError
+                    ? "offline"
+                    : "loading…"}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Step 1 + Step 2 grid */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-4 p-4 border-b border-border bg-surface">
-          <ImportPanel dataset={dataset} setDataset={setDataset} setSteps={setSteps} />
-          <SequenceExplorer steps={steps} selected={selected} setSelected={setSelected} />
+          <ImportPanel
+            dataset={dataset}
+            setDataset={setDataset}
+            setSteps={setSteps}
+          />
+          <SequenceExplorer
+            steps={steps}
+            selected={selected}
+            setSelected={setSelected}
+          />
         </div>
 
         {/* Step 3 — task tabs */}
@@ -1291,14 +2075,23 @@ export function ProcessLab() {
               transition={{ duration: 0.22 }}
             >
               {tab === "predict" && (
-                <PredictTab dataset={dataset} steps={steps} cursor={selected} />
+                <PredictTab
+                  dataset={dataset}
+                  steps={steps}
+                  cursor={selected}
+                />
               )}
               {tab === "complete" && (
-                <CompleteTab dataset={dataset} steps={steps} cursor={selected} />
+                <CompleteTab
+                  dataset={dataset}
+                  steps={steps}
+                  cursor={selected}
+                />
               )}
               {tab === "validate" && <ValidateTab steps={steps} />}
-              {tab === "anomaly" && <AnomalyTab dataset={dataset} steps={steps} />}
+              {tab === "anomaly" && <AnomalyTab steps={steps} />}
               {tab === "ood" && <OODTab />}
+              {tab === "batch" && <BatchEvalTab />}
             </motion.div>
           </AnimatePresence>
         </div>
