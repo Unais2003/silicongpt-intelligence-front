@@ -82,7 +82,7 @@ export function ModelArena() {
     COLS.map((c) => [c.key, bestIndex(MODELS, c.key, c.better ?? "higher")]),
   );
 
-  const tmpl = `40px 1fr ${COLS.map((c) => c.w).join(" ")}`;
+  const tmpl = `1fr ${COLS.map((c) => c.w).join(" ")}`;
 
   return (
     <Panel
@@ -99,7 +99,6 @@ export function ModelArena() {
           className="grid items-center gap-2 px-3 py-2 border-b border-border bg-surface text-tiny font-mono uppercase text-muted-foreground"
           style={{ gridTemplateColumns: tmpl }}
         >
-          <span>#</span>
           <span>System</span>
           {COLS.map((c) => (
             <span key={c.key} className="text-right">
@@ -119,9 +118,6 @@ export function ModelArena() {
             } ${m.us ? "bg-accent border-l-2 border-l-[var(--info)]" : ""}`}
             style={{ gridTemplateColumns: tmpl }}
           >
-            <span className="font-mono text-xs tabular">
-              {m.rank.toString().padStart(2, "0")}
-            </span>
             <span className="flex items-center gap-2 text-sm">
               {m.us && <StatusDot color="info" />}
               <ModelLogo name={m.name} />
