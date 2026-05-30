@@ -43,22 +43,6 @@ export function MissionHeader() {
 
   return (
     <header className="border-b border-border-strong bg-card">
-      {/* Top utility bar */}
-      <div className="flex items-center justify-between px-6 py-2 border-b border-border bg-surface text-tiny font-mono text-muted-foreground">
-        <div className="flex items-center gap-4">
-          <span>SILICONGPT-v0.4.1</span>
-          <span className="text-border-strong">/</span>
-          <span>NODE sgpt-train-04</span>
-          <span className="text-border-strong">/</span>
-          <span>REGION us-west-2c</span>
-          <span className="text-border-strong">/</span>
-          <span>BUILD 0x4a91e7</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span>{date}</span>
-          <span className="tabular">{time}</span>
-        </div>
-      </div>
 
       {/* Brand row */}
       <div className="flex items-stretch">
