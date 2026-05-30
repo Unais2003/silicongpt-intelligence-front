@@ -38,7 +38,7 @@ function Overview() {
             title="Head-to-head against frontier LLMs."
             desc="SiliconGPT — a 25.31M-parameter decoder trained from scratch — versus an n-gram trigram baseline and Gemini 3.5-flash on semiconductor fab process tasks. These are the three systems actually evaluated on our eval set."
           />
-          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-6 items-start">
+          <div className="flex flex-col gap-6">
             <ModelArena />
             <BenchmarkRadar />
           </div>
