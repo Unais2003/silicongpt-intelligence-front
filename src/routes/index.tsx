@@ -9,6 +9,7 @@ import { ProcessValidator } from "@/components/dashboard/ProcessValidator";
 import { ModelArchitecture } from "@/components/dashboard/ModelArchitecture";
 import { ResearchFindings } from "@/components/dashboard/ResearchFindings";
 import { DemoConsole } from "@/components/dashboard/DemoConsole";
+import { InteractiveLab } from "@/components/dashboard/InteractiveLab";
 
 export const Route = createFileRoute("/")({
   head: () => ({
