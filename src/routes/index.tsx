@@ -1,15 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { MissionHeader } from "@/components/dashboard/MissionHeader";
 import { LiveMetrics } from "@/components/dashboard/LiveMetrics";
-import { ProcessFlow } from "@/components/dashboard/ProcessFlow";
-import { NextStepPredictor } from "@/components/dashboard/NextStepPredictor";
+import { ProcessLab } from "@/components/dashboard/ProcessLab";
+import { GroundTruthComparison } from "@/components/dashboard/GroundTruthComparison";
+import { ModelArena } from "@/components/dashboard/ModelArena";
 import { OODDashboard } from "@/components/dashboard/OODDashboard";
-import { BenchmarkArena } from "@/components/dashboard/BenchmarkArena";
-import { ProcessValidator } from "@/components/dashboard/ProcessValidator";
 import { ModelArchitecture } from "@/components/dashboard/ModelArchitecture";
 import { ResearchFindings } from "@/components/dashboard/ResearchFindings";
-import { DemoConsole } from "@/components/dashboard/DemoConsole";
-import { InteractiveLab } from "@/components/dashboard/InteractiveLab";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -24,7 +21,7 @@ export const Route = createFileRoute("/")({
       {
         property: "og:description",
         content:
-          "Mission-control dashboard for SiliconGPT: live metrics, benchmark arena, OOD generalization, and process validator.",
+          "Mission-control dashboard for SiliconGPT: process lab, model arena, OOD generalization, and ground-truth evaluation.",
       },
     ],
   }),
@@ -61,52 +58,34 @@ function Index() {
       <MissionHeader />
       <LiveMetrics />
 
-      <InteractiveLab />
+      <ProcessLab />
 
       <div className="px-4 md:px-6 lg:px-8 py-8 space-y-10">
         <section>
           <SectionHeading
-            kicker="§ 01 · Process Flow"
-            title="Semiconductor fabrication, in-flight."
-            desc="Each step is a token in SiliconGPT's vocabulary. Live recipe execution streamed from the fab controller."
+            kicker="§ 03 · Evaluation"
+            title="Ground truth comparison."
+            desc="Side-by-side alignment between SiliconGPT's decoded recipe and the fab's golden reference sequence."
           />
-          <ProcessFlow />
+          <GroundTruthComparison />
         </section>
 
         <section>
           <SectionHeading
-            kicker="§ 02 · Inference"
-            title="Next-step prediction engine."
-            desc="Decoder produces a calibrated distribution over the next process operation, conditioned on the entire wafer history."
+            kicker="§ 04 · Arena"
+            title="Model Arena."
+            desc="SiliconGPT against frontier general-purpose LLMs across six metrics. A 47M-parameter model trained from scratch dominates on every axis."
           />
-          <NextStepPredictor />
+          <ModelArena />
         </section>
 
         <section>
           <SectionHeading
-            kicker="§ 03 · Generalization"
+            kicker="§ 05 · Generalization"
             title="Out-of-distribution device families."
             desc="Trained on 14 process families, evaluated on 6 held-out ones. The model transfers learned grammar to unseen technologies."
           />
           <OODDashboard />
-        </section>
-
-        <section>
-          <SectionHeading
-            kicker="§ 04 · Benchmark"
-            title="Against frontier models."
-            desc="On WaferBench v0.4, a 47M-param model trained from scratch outperforms general-purpose frontier LLMs by 40+ points."
-          />
-          <BenchmarkArena />
-        </section>
-
-        <section>
-          <SectionHeading
-            kicker="§ 05 · Validation"
-            title="Manufacturing constraints, enforced."
-            desc="Every prediction is checked against a SAT-based recipe validator. 99.7% of completions satisfy all fab rules."
-          />
-          <ProcessValidator />
         </section>
 
         <section>
@@ -125,15 +104,6 @@ function Index() {
             desc="Four results from the v0.4 cycle. Description-initialization is the single largest lever for OOD."
           />
           <ResearchFindings />
-        </section>
-
-        <section>
-          <SectionHeading
-            kicker="§ 08 · Console"
-            title="Interactive inference."
-            desc="Build a process prefix and watch SiliconGPT propose the next step. All predictions are constraint-validated."
-          />
-          <DemoConsole />
         </section>
       </div>
 
