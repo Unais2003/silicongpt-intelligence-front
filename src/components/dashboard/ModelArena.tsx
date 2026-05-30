@@ -3,7 +3,6 @@ import { Panel, StatusDot } from "./primitives";
 import { ModelLogo } from "./ModelLogo";
 
 type Row = {
-  rank: number;
   name: string;
   org: string;
   top1: number;
@@ -17,7 +16,6 @@ type Row = {
 
 const MODELS: Row[] = [
   {
-    rank: 1,
     name: "SiliconGPT",
     org: "ours · 25.31M",
     top1: 80.7,
@@ -29,7 +27,6 @@ const MODELS: Row[] = [
     us: true,
   },
   {
-    rank: 2,
     name: "N-gram (trigram)",
     org: "baseline · no params",
     top1: 76.1,
@@ -40,7 +37,6 @@ const MODELS: Row[] = [
     latency: 1,
   },
   {
-    rank: 3,
     name: "Gemini 3.5-flash",
     org: "Google · API",
     top1: 44.0,
@@ -49,39 +45,6 @@ const MODELS: Row[] = [
     completion: 6.5,
     anomalyF1: 0.842,
     latency: 2800,
-  },
-  {
-    rank: 4,
-    name: "GPT-5",
-    org: "OpenAI · API",
-    top1: 0,
-    top5: 0,
-    ood: null,
-    completion: 0,
-    anomalyF1: null,
-    latency: 0,
-  },
-  {
-    rank: 5,
-    name: "Qwen3.6-35B-A3B",
-    org: "Alibaba · open weights",
-    top1: 0,
-    top5: 0,
-    ood: null,
-    completion: 0,
-    anomalyF1: null,
-    latency: 0,
-  },
-  {
-    rank: 6,
-    name: "DeepSeek V3-0324",
-    org: "DeepSeek · open weights",
-    top1: 0,
-    top5: 0,
-    ood: null,
-    completion: 0,
-    anomalyF1: null,
-    latency: 0,
   },
 ];
 
@@ -119,7 +82,7 @@ export function ModelArena() {
     COLS.map((c) => [c.key, bestIndex(MODELS, c.key, c.better ?? "higher")]),
   );
 
-  const tmpl = `40px 1fr ${COLS.map((c) => c.w).join(" ")}`;
+  const tmpl = `1fr ${COLS.map((c) => c.w).join(" ")}`;
 
   return (
     <Panel
@@ -136,7 +99,6 @@ export function ModelArena() {
           className="grid items-center gap-2 px-3 py-2 border-b border-border bg-surface text-tiny font-mono uppercase text-muted-foreground"
           style={{ gridTemplateColumns: tmpl }}
         >
-          <span>#</span>
           <span>System</span>
           {COLS.map((c) => (
             <span key={c.key} className="text-right">
@@ -156,9 +118,6 @@ export function ModelArena() {
             } ${m.us ? "bg-accent border-l-2 border-l-[var(--info)]" : ""}`}
             style={{ gridTemplateColumns: tmpl }}
           >
-            <span className="font-mono text-xs tabular">
-              {m.rank.toString().padStart(2, "0")}
-            </span>
             <span className="flex items-center gap-2 text-sm">
               {m.us && <StatusDot color="info" />}
               <ModelLogo name={m.name} />
