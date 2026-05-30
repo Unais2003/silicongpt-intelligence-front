@@ -242,18 +242,26 @@ function HexBox({
   detail?: string;
   param?: string;
 }) {
-  const clip = "polygon(6% 0, 94% 0, 100% 50%, 94% 100%, 6% 100%, 0 50%)";
+  const c = COLORS[color];
   return (
     <>
-      <ClippedShape clip={clip} width="100%" height={72} color={color}>
+      <div
+        className="relative mx-auto flex flex-col items-center justify-center text-center px-4"
+        style={{
+          width: 140,
+          height: 140,
+          backgroundColor: `color-mix(in oklab, ${c} 14%, var(--card))`,
+          border: `2px solid ${c}`,
+        }}
+      >
         <BoxText name={name} detail={detail} color={color} />
-      </ClippedShape>
+      </div>
       {param && <ParamChip value={param} />}
     </>
   );
 }
 
-// — SwiGLU FFN: bowtie / wide-middle hexagon -------------------------------
+// — SwiGLU FFN: wide rectangle --------------------------------------------
 function BowtieBox({
   color,
   name,
@@ -265,14 +273,19 @@ function BowtieBox({
   detail?: string;
   param?: string;
 }) {
-  // Inverted points: narrow at sides, wide at middle (up→middle→down).
-  const clip =
-    "polygon(15% 0, 85% 0, 100% 30%, 100% 70%, 85% 100%, 15% 100%, 0 70%, 0 30%)";
+  const c = COLORS[color];
   return (
     <>
-      <ClippedShape clip={clip} width="100%" height={76} color={color}>
+      <div
+        className="relative w-full flex flex-col items-center justify-center text-center px-4"
+        style={{
+          height: 60,
+          backgroundColor: `color-mix(in oklab, ${c} 14%, var(--card))`,
+          border: `2px solid ${c}`,
+        }}
+      >
         <BoxText name={name} detail={detail} color={color} />
-      </ClippedShape>
+      </div>
       {param && <ParamChip value={param} />}
     </>
   );
