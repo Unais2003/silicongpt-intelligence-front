@@ -1190,7 +1190,7 @@ function OODTab() {
                   ) : f.role === "test" ? (
                     <span className="text-[var(--info)]">test</span>
                   ) : (
-                    <span className="text-warning text-[var(--warning)]">ood</span>
+                    <span className="text-[var(--warning)]">ood</span>
                   )}
                 </span>
                 <span className="font-mono text-xs tabular text-right">{f.top1.toFixed(1)}</span>
