@@ -9,6 +9,7 @@ import { ProcessValidator } from "@/components/dashboard/ProcessValidator";
 import { ModelArchitecture } from "@/components/dashboard/ModelArchitecture";
 import { ResearchFindings } from "@/components/dashboard/ResearchFindings";
 import { DemoConsole } from "@/components/dashboard/DemoConsole";
+import { InteractiveLab } from "@/components/dashboard/InteractiveLab";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -59,6 +60,8 @@ function Index() {
     <main className="min-h-screen bg-background text-foreground">
       <MissionHeader />
       <LiveMetrics />
+
+      <InteractiveLab />
 
       <div className="px-4 md:px-6 lg:px-8 py-8 space-y-10">
         <section>

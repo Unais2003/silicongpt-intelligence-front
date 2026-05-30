@@ -3,8 +3,9 @@ import { StatusDot } from "./primitives";
 import logo from "@/assets/silicongpt-logo.png";
 
 function useClock() {
-  const [t, setT] = useState(() => new Date());
+  const [t, setT] = useState<Date | null>(null);
   useEffect(() => {
+    setT(new Date());
     const i = setInterval(() => setT(new Date()), 1000);
     return () => clearInterval(i);
   }, []);
@@ -37,8 +38,8 @@ function Cell({
 
 export function MissionHeader() {
   const t = useClock();
-  const time = t.toISOString().slice(11, 19) + " UTC";
-  const date = t.toISOString().slice(0, 10);
+  const time = t ? t.toISOString().slice(11, 19) + " UTC" : "--:--:-- UTC";
+  const date = t ? t.toISOString().slice(0, 10) : "----------";
 
   return (
     <header className="border-b border-border-strong bg-card">
