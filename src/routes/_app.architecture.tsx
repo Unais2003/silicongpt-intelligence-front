@@ -2,7 +2,6 @@ import * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { ModelArchitecture } from "@/components/dashboard/ModelArchitecture";
-import { ResearchFindings } from "@/components/dashboard/ResearchFindings";
 import { SectionHeading, PageFooter, PageHeader } from "@/components/dashboard/layout";
 import { Panel, Label } from "@/components/dashboard/primitives";
 import { motion } from "framer-motion";
@@ -284,14 +283,6 @@ function ArchitecturePage() {
           <ExperimentTable />
         </section>
 
-        <section>
-          <SectionHeading
-            kicker="§ Findings"
-            title="What we learned."
-            desc="Four headline results from the v0.4 cycle."
-          />
-          <ResearchFindings />
-        </section>
       </div>
 
       <PageFooter />
