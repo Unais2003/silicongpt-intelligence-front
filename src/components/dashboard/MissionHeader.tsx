@@ -63,7 +63,7 @@ export function MissionHeader() {
         </div>
 
         <div className="flex flex-1 overflow-x-auto">
-          <Cell label="Model Status" value="OPERATIONAL" dot tone="success" />
+          
           <Cell label="Training" value="iter 17,000 · val_loss 0.3090" dot tone="info" />
           <Cell label="OOD Eval" value="IC HELD OUT · ~50% TOP-1" dot tone="success" />
           <Cell label="Benchmark" value="vs N-GRAM + GEMINI" dot tone="success" />
