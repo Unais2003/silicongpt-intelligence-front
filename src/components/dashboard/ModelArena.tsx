@@ -7,34 +7,73 @@ type Row = {
   org: string;
   top1: number;
   top5: number;
-  ood: number;
+  ood: number | null;
   completion: number;
+  anomalyF1: number | null;
   latency: number; // ms
-  cost: number; // USD per 1k runs
   us?: boolean;
 };
 
 const MODELS: Row[] = [
-  { rank: 1, name: "SiliconGPT", org: "in-house · 47M", top1: 81.0, top5: 100.0, ood: 49.5, completion: 92.4, latency: 11, cost: 0.04, us: true },
-  { rank: 2, name: "GPT-5",      org: "OpenAI",         top1: 38.4, top5: 71.2, ood: 22.1, completion: 54.6, latency: 740, cost: 12.80 },
-  { rank: 3, name: "Claude 4.5", org: "Anthropic",      top1: 36.1, top5: 68.4, ood: 21.8, completion: 52.0, latency: 690, cost: 9.20 },
-  { rank: 4, name: "Gemini 2.5", org: "Google",         top1: 33.8, top5: 64.0, ood: 19.4, completion: 49.3, latency: 580, cost: 6.40 },
-  { rank: 5, name: "Kimi K2",    org: "Moonshot",       top1: 31.0, top5: 60.5, ood: 17.1, completion: 46.7, latency: 510, cost: 3.10 },
+  {
+    rank: 1,
+    name: "SiliconGPT",
+    org: "ours · 25.31M",
+    top1: 80.7,
+    top5: 100.0,
+    ood: 49.5,
+    completion: 40.0,
+    anomalyF1: 1.0,
+    latency: 14,
+    us: true,
+  },
+  {
+    rank: 2,
+    name: "N-gram (trigram)",
+    org: "baseline · no params",
+    top1: 76.1,
+    top5: 100.0,
+    ood: null,
+    completion: 28.3,
+    anomalyF1: null,
+    latency: 1,
+  },
+  {
+    rank: 3,
+    name: "Gemini 3.5-flash",
+    org: "Google · API",
+    top1: 44.0,
+    top5: 76.0,
+    ood: null,
+    completion: 6.5,
+    anomalyF1: 0.842,
+    latency: 2800,
+  },
 ];
 
-const COLS: { key: keyof Row; label: string; suffix?: string; better?: "higher" | "lower"; w: string }[] = [
-  { key: "top1",       label: "Top-1",       suffix: "%",  better: "higher", w: "70px" },
-  { key: "top5",       label: "Top-5",       suffix: "%",  better: "higher", w: "70px" },
-  { key: "ood",        label: "OOD",         suffix: "%",  better: "higher", w: "70px" },
-  { key: "completion", label: "Completion",  suffix: "%",  better: "higher", w: "80px" },
-  { key: "latency",    label: "Latency",     suffix: "ms", better: "lower",  w: "70px" },
-  { key: "cost",       label: "Cost / 1k",   suffix: "$",  better: "lower",  w: "80px" },
+const COLS: {
+  key: keyof Row;
+  label: string;
+  suffix?: string;
+  better?: "higher" | "lower";
+  w: string;
+  fixed?: number;
+}[] = [
+  { key: "top1",       label: "Top-1",            suffix: "%",  better: "higher", w: "70px", fixed: 1 },
+  { key: "top5",       label: "Top-5",            suffix: "%",  better: "higher", w: "70px", fixed: 1 },
+  { key: "ood",        label: "OOD",              suffix: "%",  better: "higher", w: "70px", fixed: 1 },
+  { key: "completion", label: "Completion (tok%)",suffix: "%",  better: "higher", w: "120px",fixed: 1 },
+  { key: "anomalyF1",  label: "Anomaly F1",                     better: "higher", w: "80px", fixed: 3 },
+  { key: "latency",    label: "Latency",          suffix: "ms", better: "lower",  w: "80px", fixed: 0 },
 ];
 
 function bestIndex(rows: Row[], key: keyof Row, mode: "higher" | "lower") {
-  let best = 0;
-  for (let i = 1; i < rows.length; i++) {
-    const a = rows[i][key] as number;
+  let best = -1;
+  for (let i = 0; i < rows.length; i++) {
+    const v = rows[i][key];
+    if (v == null || typeof v !== "number") continue;
+    if (best === -1) { best = i; continue; }
+    const a = v as number;
     const b = rows[best][key] as number;
     if ((mode === "higher" && a > b) || (mode === "lower" && a < b)) best = i;
   }
@@ -46,15 +85,14 @@ export function ModelArena() {
     COLS.map((c) => [c.key, bestIndex(MODELS, c.key, c.better ?? "higher")]),
   );
 
-  // build column widths
   const tmpl = `40px 1fr ${COLS.map((c) => c.w).join(" ")}`;
 
   return (
     <Panel
-      title="Model Arena · WaferBench v0.4"
+      title="Model Arena · Hack_01 Process Logic Benchmark"
       meta={
         <span className="flex items-center gap-2">
-          <StatusDot color="success" /> 5 systems · 8,412 prompts · 6 metrics
+          <StatusDot color="success" /> 3 systems · 5,200 examples · next-step + completion + anomaly
         </span>
       }
     >
@@ -100,14 +138,18 @@ export function ModelArena() {
               )}
             </span>
             {COLS.map((c) => {
-              const v = m[c.key] as number;
+              const v = m[c.key];
               const isBest = winners[c.key] === i;
-              const formatted =
-                c.suffix === "$"
-                  ? `$${v.toFixed(2)}`
-                  : c.suffix === "ms"
-                    ? `${v.toFixed(0)}`
-                    : v.toFixed(1);
+              if (v == null) {
+                return (
+                  <span key={c.key as string} className="font-mono text-xs tabular text-right text-muted-foreground">
+                    —
+                  </span>
+                );
+              }
+              const num = v as number;
+              const fixed = c.fixed ?? 1;
+              const formatted = num.toFixed(fixed);
               return (
                 <span
                   key={c.key as string}
@@ -116,7 +158,7 @@ export function ModelArena() {
                   }`}
                 >
                   {formatted}
-                  {c.suffix && c.suffix !== "$" && (
+                  {c.suffix && (
                     <span className="text-muted-foreground ml-0.5 text-tiny">{c.suffix}</span>
                   )}
                 </span>
@@ -128,25 +170,26 @@ export function ModelArena() {
 
       <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-px bg-border border border-border">
         <div className="bg-card p-3">
-          <div className="text-tiny font-mono text-muted-foreground">DELTA vs FRONTIER</div>
-          <div className="font-mono text-lg tabular text-[var(--success)]">+42.6 pt</div>
+          <div className="text-tiny font-mono text-muted-foreground">vs GEMINI · TOP-1</div>
+          <div className="font-mono text-lg tabular text-[var(--success)]">+36.7 pt</div>
         </div>
         <div className="bg-card p-3">
-          <div className="text-tiny font-mono text-muted-foreground">PARAMS RATIO</div>
-          <div className="font-mono text-lg tabular">1 : 4,000+</div>
+          <div className="text-tiny font-mono text-muted-foreground">API COST</div>
+          <div className="font-mono text-lg tabular">0 vs Gemini</div>
         </div>
         <div className="bg-card p-3">
           <div className="text-tiny font-mono text-muted-foreground">LATENCY ADVANTAGE</div>
-          <div className="font-mono text-lg tabular text-[var(--info)]">67× faster</div>
+          <div className="font-mono text-lg tabular text-[var(--info)]">200× vs Gemini</div>
         </div>
         <div className="bg-card p-3">
-          <div className="text-tiny font-mono text-muted-foreground">COST ADVANTAGE</div>
-          <div className="font-mono text-lg tabular text-[var(--info)]">320× cheaper</div>
+          <div className="text-tiny font-mono text-muted-foreground">ANOMALY F1</div>
+          <div className="font-mono text-lg tabular text-[var(--success)]">1.000 · perfect</div>
         </div>
       </div>
 
       <div className="mt-3 text-tiny font-mono text-muted-foreground">
-        Higher is better for accuracy metrics; lower is better for latency & cost. Best-in-column shown in green.
+        Higher is better for accuracy metrics; lower is better for latency. Best-in-column shown in green.
+        N-gram and Gemini were not evaluated on OOD/anomaly tasks where applicable.
       </div>
     </Panel>
   );
