@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { ModelArchitecture } from "@/components/dashboard/ModelArchitecture";
-import { PageFooter, PageHeader } from "@/components/dashboard/layout";
+import { CoScientistDiagram } from "@/components/dashboard/CoScientistDiagram";
+import { PageFooter, PageHeader, SectionHeading } from "@/components/dashboard/layout";
 
 export const Route = createFileRoute("/_app/architecture")({
   head: () => ({
@@ -39,8 +40,17 @@ function ArchitecturePage() {
         <ModelArchitecture />
       </div>
 
+      <div className="px-4 md:px-6 lg:px-8 py-8 border-t border-border">
+        <SectionHeading
+          kicker="§ Research Method"
+          title="How we found the architecture."
+          desc="A team of specialized LLM agents that generate, debate, tournament-rank, evolve, and synthesize hypotheses — extended with a GPU-benchmarking Experiment agent that ranks ideas on real measured results, not just argument."
+        />
+        <CoScientistDiagram />
+      </div>
 
       <PageFooter />
     </main>
   );
 }
+
