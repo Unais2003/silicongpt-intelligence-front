@@ -1,6 +1,8 @@
 // Brand logos for model providers, rendered as inline SVGs.
 // Returns null when we don't have an official mark for the provider.
 
+import siliconLogo from "@/assets/silicongpt-logo.png";
+
 type Props = { name: string; size?: number };
 
 function Wrap({ size, children, title }: { size: number; children: React.ReactNode; title: string }) {
@@ -17,6 +19,15 @@ function Wrap({ size, children, title }: { size: number; children: React.ReactNo
 
 export function ModelLogo({ name, size = 16 }: Props) {
   const n = name.toLowerCase();
+
+  if (n.includes("silicon")) {
+    return (
+      <Wrap size={size} title="SiliconGPT">
+        <img src={siliconLogo} alt="" width={size} height={size} style={{ objectFit: "contain" }} />
+      </Wrap>
+    );
+  }
+
 
   if (n.includes("gemini")) {
     // Google Gemini spark mark
