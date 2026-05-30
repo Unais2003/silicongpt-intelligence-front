@@ -129,7 +129,7 @@ export function InteractiveLab() {
             </span>
           </div>
           <div className="flex items-center gap-4 text-tiny font-mono text-muted-foreground">
-            <span>SESSION 0x{Math.floor(Math.random() * 0).toString(16) || "8af1c2"}</span>
+            <span>SESSION 0x8af1c2</span>
             <span>·</span>
             <span>KV-CACHE ON</span>
             <span>·</span>
