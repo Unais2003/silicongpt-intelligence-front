@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Panel, StatusDot } from "./primitives";
+import { ModelLogo } from "./ModelLogo";
 
 type Row = {
   rank: number;
@@ -160,6 +161,7 @@ export function ModelArena() {
             </span>
             <span className="flex items-center gap-2 text-sm">
               {m.us && <StatusDot color="info" />}
+              <ModelLogo name={m.name} />
               <span className={m.us ? "font-semibold" : ""}>{m.name}</span>
               <span className="text-tiny font-mono text-muted-foreground">
                 {m.org}

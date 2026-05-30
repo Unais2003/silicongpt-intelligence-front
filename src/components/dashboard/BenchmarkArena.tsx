@@ -1,4 +1,5 @@
 import { Panel, StatusDot } from "./primitives";
+import { ModelLogo } from "./ModelLogo";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from "recharts";
 
 type Row = {
@@ -87,6 +88,7 @@ export function BenchmarkArena() {
             <span className="font-mono text-xs">{m.rank.toString().padStart(2, "0")}</span>
             <span className="flex items-center gap-2 text-sm">
               {m.us && <StatusDot color="success" />}
+              <ModelLogo name={m.name} />
               <span className={m.us ? "font-semibold" : ""}>{m.name}</span>
               <span className="text-tiny font-mono text-muted-foreground">{m.org}</span>
               {m.us && <span className="text-tiny font-mono text-muted-foreground">SOTA</span>}
