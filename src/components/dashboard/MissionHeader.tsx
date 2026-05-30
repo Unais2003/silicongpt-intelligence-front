@@ -63,19 +63,14 @@ export function MissionHeader() {
       {/* Brand row */}
       <div className="flex items-stretch">
         <div className="flex items-center gap-5 px-6 py-5 border-r border-border">
-          <div className="h-10 w-10 border border-border-strong flex items-center justify-center bg-surface">
-            <span className="font-serif text-xl leading-none">S</span>
-          </div>
-          <div>
-            <div className="flex items-baseline gap-3">
-              <img
-                src={logo}
-                alt="SiliconGPT"
-                className="h-7 w-auto"
-              />
-              <span className="text-tiny font-mono text-muted-foreground uppercase tracking-widest">
-                Industrial Process Intelligence
-              </span>
+          <img
+            src={logo}
+            alt="SiliconGPT"
+            className="h-9 w-auto object-contain"
+          />
+          <div className="pl-5 border-l border-border">
+            <div className="text-tiny font-mono text-muted-foreground uppercase tracking-widest">
+              Industrial Process Intelligence
             </div>
             <div className="mt-1 text-xs text-muted-foreground font-mono">
               Decoder-only transformer · trained from scratch on wafer fabrication process grammar
