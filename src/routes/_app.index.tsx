@@ -36,7 +36,7 @@ function Overview() {
           <SectionHeading
             kicker="§ 01 · Arena"
             title="Head-to-head against frontier LLMs."
-            desc="SiliconGPT — a 47M-parameter decoder trained from scratch — versus GPT-5, Claude 4.5, Gemini 2.5, and Kimi K2 on semiconductor process tasks. WaferBench v0.4 radar on the right."
+            desc="SiliconGPT — a 25.31M-parameter decoder trained from scratch — versus an n-gram trigram baseline and Gemini 3.5-flash on semiconductor fab process tasks. These are the three systems actually evaluated on our eval set."
           />
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-6 items-start">
             <ModelArena />
@@ -47,8 +47,8 @@ function Overview() {
         <section>
           <SectionHeading
             kicker="§ 02 · Benchmark"
-            title="WaferBench v0.4 leaderboard."
-            desc="Domain accuracy, validity, and OOD transfer — measured across the full benchmark suite."
+            title="Hack_01 Process Logic leaderboard."
+            desc="Next-step top-1, sequence completion token accuracy, and anomaly F1 — scored on 5,200 held-out examples."
           />
           <BenchmarkArena />
         </section>
