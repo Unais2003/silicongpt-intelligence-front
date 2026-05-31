@@ -19,10 +19,10 @@ type Row = {
 const MODELS: Row[] = [
   { name: "SiliconGPT",       org: "ours · 1.37M",            top1: 81.1, top5: 100.0, ood: 50.3, completion: 40.5, anomalyF1: 1.0,   latency: 14,   us: true },
   { name: "N-gram (trigram)", org: "baseline · no params",    top1: 76.1, top5: 100.0, ood: null, completion: 28.3, anomalyF1: null,  latency: 1 },
-  { name: "Gemini 3.5-flash", org: "Google · API",            top1: 55.5, top5: 78.0,  ood: null, completion: 7.6,  anomalyF1: 0.910, latency: null },
-  { name: "GPT-5",            org: "OpenAI · API",            top1: 52.5, top5: 72.0,  ood: null, completion: null, anomalyF1: null,  latency: null },
-  { name: "DeepSeek V3-0324", org: "DeepSeek · open weights",  top1: 48.0, top5: 65.0,  ood: null, completion: 5.6,  anomalyF1: 0.603, latency: null },
-  { name: "Qwen3.6-35B-A3B",  org: "Alibaba · open weights",   top1: 41.5, top5: 63.5,  ood: null, completion: 2.5,  anomalyF1: 0.690, latency: null },
+  { name: "Gemini 3.5-flash", org: "Google · API",            top1: 55.5, top5: 78.0,  ood: null, completion: 7.6,  anomalyF1: 0.910, latency: 5300 },
+  { name: "GPT-5",            org: "OpenAI · API",            top1: 52.5, top5: 72.0,  ood: null, completion: null, anomalyF1: null,  latency: 35000 },
+  { name: "DeepSeek V3-0324", org: "DeepSeek · open weights",  top1: 48.0, top5: 65.0,  ood: null, completion: 5.6,  anomalyF1: 0.603, latency: 6500 },
+  { name: "Qwen3.6-35B-A3B",  org: "Alibaba · open weights",   top1: 41.5, top5: 63.5,  ood: null, completion: 2.5,  anomalyF1: 0.690, latency: 1900 },
 ];
 
 const COLS: {
@@ -32,13 +32,14 @@ const COLS: {
   better?: "higher" | "lower";
   w: string;
   fixed?: number;
+  fmt?: (v: number) => string;
 }[] = [
-  { key: "top1",       label: "Top-1",            suffix: "%",  better: "higher", w: "70px", fixed: 1 },
-  { key: "top5",       label: "Top-5",            suffix: "%",  better: "higher", w: "70px", fixed: 1 },
-  { key: "ood",        label: "OOD",              suffix: "%",  better: "higher", w: "70px", fixed: 1 },
-  { key: "completion", label: "Completion (tok%)",suffix: "%",  better: "higher", w: "120px",fixed: 1 },
-  { key: "anomalyF1",  label: "Anomaly F1",                     better: "higher", w: "80px", fixed: 3 },
-  { key: "latency",    label: "Latency",          suffix: "ms", better: "lower",  w: "80px", fixed: 0 },
+  { key: "top1",       label: "Top-1",                suffix: "%", better: "higher", w: "70px",  fixed: 1 },
+  { key: "top5",       label: "Top-5",                suffix: "%", better: "higher", w: "70px",  fixed: 1 },
+  { key: "ood",        label: "OOD",                  suffix: "%", better: "higher", w: "70px",  fixed: 1 },
+  { key: "completion", label: "Completion (token %)", suffix: "%", better: "higher", w: "130px", fixed: 1 },
+  { key: "anomalyF1",  label: "Anomaly F1",                        better: "higher", w: "80px",  fixed: 3 },
+  { key: "latency",    label: "Latency",              better: "lower", w: "90px", fmt: (v) => (v < 1000 ? `${v.toFixed(0)}ms` : `${(v / 1000).toFixed(1)}s`) },
 ];
 
 function bestIndex(rows: Row[], key: keyof Row, mode: "higher" | "lower") {
@@ -120,7 +121,7 @@ export function ModelArena() {
               }
               const num = v as number;
               const fixed = c.fixed ?? 1;
-              const formatted = num.toFixed(fixed);
+              const formatted = c.fmt ? c.fmt(num) : num.toFixed(fixed);
               return (
                 <span
                   key={c.key as string}
@@ -129,7 +130,7 @@ export function ModelArena() {
                   }`}
                 >
                   {formatted}
-                  {c.suffix && (
+                  {c.suffix && !c.fmt && (
                     <span className="text-muted-foreground ml-0.5 text-tiny">{c.suffix}</span>
                   )}
                 </span>
@@ -150,7 +151,7 @@ export function ModelArena() {
         </div>
         <div className="bg-card p-3">
           <div className="text-tiny font-mono text-muted-foreground">LATENCY ADVANTAGE</div>
-          <div className="font-mono text-lg tabular text-[var(--info)]">200× vs Gemini</div>
+          <div className="font-mono text-lg tabular text-[var(--info)]">~380× vs Gemini</div>
         </div>
         <div className="bg-card p-3">
           <div className="text-tiny font-mono text-muted-foreground">ANOMALY F1</div>
@@ -158,9 +159,12 @@ export function ModelArena() {
         </div>
       </div>
 
-      <div className="mt-3 text-tiny font-mono text-muted-foreground">
-        Higher is better for accuracy metrics; lower is better for latency. Best-in-column shown in green.
-        N-gram and Gemini were not evaluated on OOD/anomaly tasks where applicable.
+      <div className="mt-3 text-tiny font-mono text-muted-foreground leading-relaxed">
+        SiliconGPT and the n-gram baseline are scored on the full 5,200-example held-out eval
+        (3,600 next-step · 600 completion · 1,000 anomaly); the frontier LLMs on a 200-example sample.
+        OOD measures generalization to an unseen product family, so it applies only to our trained model;
+        the n-gram and GPT-5 have no anomaly score. A dash (—) means the metric was not evaluated for that
+        model. Higher is better for accuracy; lower for latency; the best value in each column is green.
       </div>
     </Panel>
   );
