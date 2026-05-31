@@ -65,7 +65,14 @@ export type NextStepMetrics = Record<
 >;
 export type CompletionMetrics = Record<
   string,
-  { exact_match: number; norm_edit_dist: number; token_acc: number; n: number }
+  {
+    exact_match?: number;
+    norm_edit_dist?: number;
+    token_acc?: number;
+    block_acc?: number;
+    validity?: number;
+    n: number;
+  }
 >;
 export type AnomalyMetrics = Record<
   string,

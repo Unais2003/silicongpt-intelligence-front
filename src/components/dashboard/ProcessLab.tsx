@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Info } from "lucide-react";
 import { StatusDot } from "./primitives";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   api,
   type AnomalyEval,
+  type AnomalyMetrics,
   type AnomalyResult,
   type CompletionEval,
   type Health,
@@ -25,112 +34,30 @@ type Dataset = {
   steps: string[];
 };
 
-// IMPORTANT: tokens use SPACES (real backend vocab), not underscores.
+// Real, in-vocab process recipes pulled from the training distribution (data/train_pool.csv).
+// Every token matches the model's exact 202-token vocab, so single-step inference is genuine
+// (the old hand-written presets used invented tokens that resolved to <UNK>).
 const DATASETS: Record<string, Dataset> = {
   MOSFET: {
     id: "MOSFET",
-    family: "Power MOSFET",
-    node: "0.5 µm · 6\" wafer",
-    description: "Planar n-channel MOSFET, 23-step reference recipe",
-    steps: [
-      "RECEIVE WAFER",
-      "RCA CLEAN",
-      "GROW THERMAL OXIDE",
-      "DEPOSIT POLYSILICON",
-      "PHOTORESIST COAT",
-      "ALIGN MASK LEVEL 1",
-      "EXPOSE LITHO LEVEL 1",
-      "DEVELOP PHOTORESIST",
-      "ETCH POLYSILICON",
-      "STRIP PHOTORESIST",
-      "IMPLANT N+",
-      "ANNEAL DOPANTS",
-      "DEPOSIT ILD",
-      "CMP ILD",
-      "PHOTORESIST COAT",
-      "ALIGN MASK LEVEL 2",
-      "EXPOSE LITHO LEVEL 2",
-      "DEVELOP PHOTORESIST",
-      "ETCH CONTACT",
-      "DEPOSIT METAL 1",
-      "ETCH METAL 1",
-      "DEPOSIT PASSIVATION",
-      "ELECTRICAL TEST",
-    ],
+    family: "MOSFET",
+    node: "real recipe · 125 steps",
+    description: "Real MOSFET process recipe from the training distribution.",
+    steps: ["RECEIVE WAFER LOT", "LOT IDENTIFICATION", "INITIAL WAFER INSPECTION", "MEASURE SURFACE PARTICLES", "PRE CLEAN WAFER", "RCA CLEAN 1", "WET CLEAN RCA2", "HF DIP", "DRY WAFER", "SUBSTRATE CHECK", "EPITAXY PREP", "EPITAXIAL DEPOSITION", "MEASURE EPITAXY THICKNESS", "MEASURE RESISTIVITY", "EPITAXY ANNEAL", "WAFER SURFACE CLEAN", "THERMAL OXIDATION", "MEASURE OXIDE THICKNESS", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 1", "EXPOSE LITHO LEVEL 1", "POST EXPOSE BAKE", "DEVELOP PHOTORESIST", "PATTERN INSPECTION LEVEL 1", "HARD BAKE", "OXIDE ETCH", "STRIP PHOTORESIST", "CLEAN AFTER ETCH", "MEASURE OPENING CD", "IMPLANT WELL", "PRE ANNEAL CHECK", "DRIVE IN DIFFUSION", "RAPID THERMAL ANNEAL", "MEASURE JUNCTION DEPTH", "THERMAL OXIDATION", "GATE OXIDE PREP", "GATE OXIDE GROWTH", "MEASURE GATE OXIDE THICKNESS", "DEPOSIT POLYSILICON", "POLYSILICON ANNEAL", "MEASURE POLY THICKNESS", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 2", "EXPOSE LITHO LEVEL 2", "DEVELOP PHOTORESIST", "POLY PATTERN INSPECTION", "HARD BAKE", "POLYSILICON ETCH", "STRIP RESIST", "CLEAN AFTER POLY ETCH", "IMPLANT SOURCE DRAIN", "LIGHT ANNEAL", "MEASURE SHEET RESISTANCE", "DEPOSIT SPACER DIELECTRIC", "ANISOTROPIC ETCH SPACER", "MEASURE SPACER WIDTH", "IMPLANT LDD", "RAPID THERMAL ANNEAL", "DEPOSIT INTERLAYER DIELECTRIC", "DENSIFY DIELECTRIC", "MEASURE DIELECTRIC THICKNESS", "CMP DIELECTRIC", "MEASURE SURFACE PLANARITY", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 3", "EXPOSE LITHO LEVEL 3", "DEVELOP PHOTORESIST", "VIA OPENING INSPECTION", "DIELECTRIC ETCH VIA", "STRIP RESIST", "CLEAN AFTER VIA ETCH", "MEASURE VIA CD", "DEPOSIT BARRIER METAL", "DEPOSIT METAL SEED", "FILL VIA METAL", "CMP VIA FILL", "MEASURE CONTACT RESISTANCE", "DEPOSIT TOP METAL", "ANNEAL METAL 1", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 4", "EXPOSE LITHO LEVEL 4", "POST EXPOSE BAKE", "DEVELOP PHOTORESIST", "METAL PATTERN INSPECTION", "HARD BAKE", "METAL ETCH", "STRIP PHOTORESIST", "CLEAN AFTER METAL ETCH", "DEPOSIT PASSIVATION", "CURE PASSIVATION", "MEASURE PASSIVATION THICKNESS", "OPEN BOND PAD WINDOW", "OPEN PAD WINDOW LITHO", "DEVELOP PAD WINDOW", "PASSIVATION ETCH", "STRIP RESIST", "CLEAN PAD OPENING", "MEASURE PAD OPENING", "BACKSIDE CLEAN", "BACKSIDE GRIND", "MEASURE WAFER THICKNESS", "BACKSIDE ETCH CLEAN", "BACKSIDE RINSE", "BACKSIDE DRY", "BACKSIDE METALLIZATION PREP", "DEPOSIT BACKSIDE METAL", "BACKSIDE ANNEAL", "MEASURE BACKSIDE CONTACT", "FINAL CLEAN", "FINAL THICKNESS MEASURE", "FINAL GEOMETRY CHECK", "FINAL PARTICLE INSPECTION", "PARAMETRIC TEST", "LEAKAGE TEST", "THRESHOLD VOLTAGE TEST", "SWITCHING TEST", "WAFER SORT TEST", "YIELD ANALYSIS", "LOT RELEASE", "SHIP LOT"],
   },
   IGBT: {
     id: "IGBT",
-    family: "Insulated-Gate Bipolar Transistor",
-    node: "1.2 µm · 8\" wafer",
-    description: "Trench IGBT with backside collector, 18-step recipe",
-    steps: [
-      "RECEIVE WAFER",
-      "RCA CLEAN",
-      "DEPOSIT EPI LAYER",
-      "GROW FIELD OXIDE",
-      "PHOTORESIST COAT",
-      "ALIGN MASK LEVEL 1",
-      "EXPOSE LITHO LEVEL 1",
-      "DEVELOP PHOTORESIST",
-      "IMPLANT P-BASE",
-      "DRIVE IN",
-      "GROW GATE OXIDE",
-      "DEPOSIT POLYSILICON",
-      "ETCH POLYSILICON",
-      "DEPOSIT METAL 1",
-      "BACKSIDE GRIND",
-      "DEPOSIT BACKSIDE METAL",
-      "DEPOSIT PASSIVATION",
-      "ELECTRICAL TEST",
-    ],
+    family: "IGBT",
+    node: "real recipe · 144 steps",
+    description: "Real IGBT process recipe from the training distribution.",
+    steps: ["RECEIVE WAFER LOT", "LOT IDENTIFICATION", "INITIAL WAFER INSPECTION", "MEASURE SURFACE PARTICLES", "PRE CLEAN WAFER", "BACKSIDE CLEAN", "FRONTSIDE CLEAN", "RCA CLEAN 1", "RCA CLEAN 2", "HF DIP", "DRY WAFER", "EPITAXIAL WAFER CHECK", "MEASURE EPITAXY THICKNESS", "MEASURE RESISTIVITY", "EPITAXIAL LAYER PREP", "THERMAL OXIDATION", "MEASURE OXIDE THICKNESS", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 1", "EXPOSE LITHO LEVEL 1", "DEVELOP PHOTORESIST", "INSPECT PATTERN LEVEL 1", "OXIDE ETCH DRY", "STRIP PHOTORESIST", "CLEAN AFTER OXIDE ETCH", "IMPLANT P BODY", "DRIVE IN DIFFUSION", "RAPID THERMAL ANNEAL", "THERMAL OXIDATION", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 2", "EXPOSE LITHO LEVEL 2", "DEVELOP PHOTORESIST", "P BODY WINDOW INSPECTION", "ETCH SILICON OR OXIDE WINDOW", "STRIP RESIST", "CLEAN AFTER WINDOW ETCH", "MEASURE WINDOW CD", "IMPLANT N BUFFER", "PRE ANNEAL CHECK", "RAPID THERMAL ANNEAL", "MEASURE SHEET RESISTANCE", "EPITAXIAL REWORK CHECK", "DEPOSIT FIELD OXIDE", "DENSIFY OXIDE", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 3", "EXPOSE LITHO LEVEL 3", "POST EXPOSE BAKE", "DEVELOP PHOTORESIST", "FIELD PATTERN INSPECTION", "FIELD OXIDE ETCH", "STRIP RESIST", "CLEAN AFTER FIELD ETCH", "MEASURE SURFACE UNIFORMITY", "IMPLANT SOURCE REGION", "IMPLANT DRAIN / CATHODE REGION", "RAPID THERMAL ANNEAL", "MEASURE SHEET RESISTANCE", "DEPOSIT GATE OXIDE OR DIELECTRIC", "ANNEAL DIELECTRIC", "DEPOSIT POLYSILICON", "POLYSILICON ANNEAL", "MEASURE POLY THICKNESS", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 4", "EXPOSE LITHO LEVEL 4", "POST EXPOSE BAKE", "DEVELOP PHOTORESIST", "POLY PATTERN INSPECTION", "HARD BAKE", "POLYSILICON ETCH DRY", "STRIP PHOTORESIST", "CLEAN AFTER POLY ETCH", "MEASURE GATE CD", "IMPLANT CHANNEL STOP", "RAPID THERMAL ANNEAL", "MEASURE DEVICE PARAMETER", "DEPOSIT INTERLAYER DIELECTRIC", "DENSIFY DIELECTRIC", "MEASURE DIELECTRIC THICKNESS", "CMP DIELECTRIC", "MEASURE PLANARITY", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 5", "EXPOSE LITHO LEVEL 5", "DEVELOP PHOTORESIST", "VIA INSPECTION", "VIA ETCH", "STRIP RESIST", "CLEAN AFTER VIA ETCH", "DEPOSIT BARRIER METAL", "DEPOSIT METAL SEED", "FILL VIA METAL", "CMP VIA FILL", "MEASURE VIA RESISTANCE", "DEPOSIT METAL 1", "ANNEAL METAL 1", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 6", "EXPOSE LITHO LEVEL 6", "DEVELOP PHOTORESIST", "METAL PATTERN INSPECTION", "HARD BAKE", "METAL ETCH DRY", "STRIP RESIST", "CLEAN AFTER METAL ETCH", "DEPOSIT PASSIVATION", "CURE PASSIVATION", "MEASURE PASSIVATION THICKNESS", "OPEN BOND PAD WINDOW", "OPEN PAD WINDOW LITHO", "DEVELOP PAD WINDOW", "PASSIVATION ETCH", "STRIP PHOTORESIST", "CLEAN PAD OPENING", "MEASURE PAD OPENING", "BACKSIDE GRIND", "MEASURE THICKNESS", "BACKSIDE ETCH CLEAN", "BACKSIDE RINSE", "BACKSIDE DRY", "BACKSIDE METALLIZATION PREP", "DEPOSIT BACKSIDE METAL", "BACKSIDE ANNEAL", "MEASURE BACKSIDE CONTACT", "FINAL CLEAN", "FINAL THICKNESS MEASURE", "FINAL GEOMETRY CHECK", "FINAL PARTICLE INSPECTION", "ELECTRICAL PARAMETRIC TEST", "LEAKAGE TEST", "BREAKDOWN VOLTAGE TEST", "SWITCHING TEST", "YIELD ANALYSIS", "WAFER SORT TEST", "FINAL LOT RELEASE", "SHIP LOT"],
   },
   IC: {
     id: "IC",
-    family: "CMOS Logic (FEOL + BEOL)",
-    node: "28 nm · 12\" wafer",
-    description: "Full CMOS flow with damascene BEOL, 23-step recipe",
-    steps: [
-      "RECEIVE WAFER",
-      "RCA CLEAN",
-      "ETCH STI",
-      "DEPOSIT STI OXIDE",
-      "CMP OXIDE",
-      "IMPLANT WELL",
-      "GROW GATE OXIDE",
-      "DEPOSIT POLYSILICON",
-      "PHOTORESIST COAT",
-      "ALIGN MASK LEVEL 1",
-      "EXPOSE LITHO LEVEL 1",
-      "DEVELOP PHOTORESIST",
-      "ETCH POLYSILICON",
-      "IMPLANT LDD",
-      "DEPOSIT SPACER",
-      "IMPLANT S/D",
-      "ANNEAL DOPANTS",
-      "DEPOSIT ILD",
-      "ETCH CONTACT",
-      "DEPOSIT METAL 1",
-      "ETCH METAL 1",
-      "DEPOSIT PASSIVATION",
-      "ELECTRICAL TEST",
-    ],
-  },
-  OOD: {
-    id: "OOD",
-    family: "Novel Device · Held-Out",
-    node: "Sub-2 nm · research",
-    description:
-      "Out-of-distribution sample. Tokens are illustrative — most will resolve to <UNK>.",
-    steps: [
-      "RECEIVE WAFER",
-      "CRYO ETCH",
-      "2D TRANSFER MoS2",
-      "ALD HfZrO2",
-      "FERRO ANNEAL",
-      "GRAPHENE CONTACT",
-      "BEOL AIR GAP",
-      "PHOTONIC COUPLER",
-    ],
+    family: "IC",
+    node: "real recipe · 112 steps",
+    description: "Real IC process recipe from the training distribution.",
+    steps: ["RECEIVE WAFER LOT", "LOT IDENTIFICATION", "INITIAL WAFER INSPECTION", "MEASURE INITIAL GEOMETRY", "WAFER CLEAN PRE PROCESS", "RCA CLEAN 1", "WET CLEAN RCA2", "HF DIP", "WAFER CLEAN PRE-GRIND", "GRINDING WAFER BACKSIDE", "MEASURE GEOMETRY", "ETCH WET BACKSIDE", "RINSE WET WAFER_EDGE", "DRY WAFER BACKSIDE", "BACKSIDE CLEAN", "MEASURE BACKSIDE ROUGHNESS", "THERMAL OXIDATION", "MEASURE OXIDE THICKNESS", "WET CLEAN RCA1", "RCA CLEAN 2", "HF DIP", "OXIDE STRIP", "SURFACE PREP FOR DEPOSITION", "DEPOSIT PAD OXIDE", "ANNEAL OXIDE", "MEASURE FILM THICKNESS", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 1", "EXPOSE LITHO LEVEL 1", "DEVELOP PHOTORESIST", "INSPECT PATTERN LEVEL 1", "HARD BAKE", "OXIDE ETCH DRY", "STRIP PHOTORESIST", "CLEAN AFTER ETCH", "DEPOSIT POLYSILICON", "ANNEAL POLYSILICON", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 2", "EXPOSE LITHO LEVEL 2", "DEVELOP PHOTORESIST", "PATTERN INSPECTION LEVEL 2", "POLYSILICON ETCH DRY", "STRIP RESIST", "CLEAN AFTER POLY ETCH", "MEASURE CD LEVEL 2", "IMPLANT N-TYPE", "PRE ANNEAL CHECK", "RAPID THERMAL ANNEAL", "DEPOSIT INTERLAYER DIELECTRIC", "DENSIFY DIELECTRIC", "MEASURE DIELECTRIC THICKNESS", "CMP DIELECTRIC", "MEASURE SURFACE PLANARITY", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 3", "EXPOSE LITHO LEVEL 3", "POST EXPOSE BAKE", "DEVELOP PHOTORESIST", "VIA OPENING INSPECTION", "HARD BAKE", "VIA ETCH", "STRIP RESIST", "CLEAN AFTER VIA ETCH", "MEASURE VIA CD", "DEPOSIT BARRIER METAL", "DEPOSIT TUNGSTEN SEED", "FILL VIA TUNGSTEN", "CMP METAL", "MEASURE VIA RESISTANCE", "DEPOSIT METAL 1", "ANNEAL METAL 1", "SPIN COAT PHOTORESIST", "SOFT BAKE", "ALIGN MASK LEVEL 4", "EXPOSE LITHO LEVEL 4", "DEVELOP PHOTORESIST", "METAL PATTERN INSPECTION", "HARD BAKE", "METAL ETCH DRY", "STRIP PHOTORESIST", "CLEAN AFTER METAL ETCH", "MEASURE LINE WIDTH", "DEPOSIT PASSIVATION", "CURE PASSIVATION", "MEASURE PASSIVATION THICKNESS", "OPEN BOND PAD WINDOW", "OPEN PAD WINDOW LITHO", "DEVELOP PHOTORESIST", "PASSIVATION ETCH PAD OPENING", "STRIP RESIST", "CLEAN PAD OPENING", "MEASURE PAD OPENING", "BACKSIDE THINNING CHECK", "BACKSIDE CLEAN", "DEPOSIT BACKSIDE PROTECTION", "BACKSIDE ANNEAL", "FINAL CLEAN", "FINAL THICKNESS MEASURE", "FINAL GEOMETRY CHECK", "FINAL PARTICLE INSPECTION", "ELECTRICAL PARAMETRIC TEST", "LEAKAGE TEST", "PARAMETRIC TEST", "SWITCHING TEST", "WAFER SORT TEST", "YIELD ANALYSIS", "FINAL LOT RELEASE", "SHIP LOT"],
   },
 };
 
@@ -767,6 +694,13 @@ function CompleteTab({
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [latency, setLatency] = useState<number | null>(null);
+  const [score, setScore] = useState<{
+    exact: boolean;
+    ned: number;
+    tok: number;
+    blk: number;
+    n: number;
+  } | null>(null);
   const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelled = useRef(false);
 
@@ -802,6 +736,19 @@ function CompleteTab({
     try {
       const r = await api.complete(prefix, { greedy: true });
       setLatency(r.latency_ms);
+      const tr = steps.slice(cursor + 1); // ground-truth remainder of the loaded recipe
+      if (tr.length) {
+        const tok =
+          tr.reduce((a, t, i) => a + (r.generated[i] === t ? 1 : 0), 0) /
+          tr.length;
+        setScore({
+          exact: r.generated.join("|") === tr.join("|"),
+          ned: nedFromTokens(r.generated, tr),
+          tok,
+          blk: blockAccTokens(r.generated, tr),
+          n: tr.length,
+        });
+      } else setScore(null);
       reveal(r.generated);
     } catch (e) {
       setError(String(e));
@@ -814,6 +761,7 @@ function CompleteTab({
     setOut([]);
     setError(null);
     setLatency(null);
+    setScore(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, dataset.id, steps.join("|")]);
 
@@ -873,6 +821,32 @@ function CompleteTab({
           </span>
         )}
       </div>
+
+      {score && !running && (
+        <div className="flex flex-wrap gap-x-5 gap-y-1 pt-2 border-t border-border-strong font-mono text-tiny text-muted-foreground">
+          <span className="uppercase tracking-widest">
+            vs ground-truth suffix · {score.n} steps
+          </span>
+          <span>
+            Exact{" "}
+            <span className={score.exact ? "text-[var(--success)]" : "text-foreground"}>
+              {score.exact ? "✓" : "✗"}
+            </span>
+          </span>
+          <span>
+            Token-acc{" "}
+            <span className="text-foreground tabular">{(score.tok * 100).toFixed(1)}%</span>
+          </span>
+          <span>
+            Block{" "}
+            <span className="text-foreground tabular">{(score.blk * 100).toFixed(1)}%</span>
+          </span>
+          <span>
+            NED{" "}
+            <span className="text-foreground tabular">{score.ned.toFixed(3)}</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -1164,6 +1138,8 @@ const METRIC_COLUMNS: Record<Task, { key: string; label: string }[]> = {
     { key: "exact_match", label: "Exact" },
     { key: "norm_edit_dist", label: "NED" },
     { key: "token_acc", label: "Token Acc" },
+    { key: "block_acc", label: "Block" },
+    { key: "validity", label: "Validity" },
     { key: "n", label: "N" },
   ],
   anomaly: [
@@ -1255,6 +1231,31 @@ function MetricsTable({
   );
 }
 
+function ConfusionMatrix({ metrics }: { metrics: AnomalyMetrics | null }) {
+  const all = metrics?.ALL;
+  if (!all || !all.confusion) return null;
+  const { tp, fp, fn, tn } = all.confusion;
+  const cell = "bg-card p-2 text-center tabular";
+  return (
+    <div className="border border-border p-3">
+      <div className="text-tiny font-mono uppercase tracking-widest text-muted-foreground mb-2">
+        Confusion matrix · positive class = anomaly · all families
+      </div>
+      <div className="grid grid-cols-[120px_72px_72px] gap-px bg-border w-max text-xs font-mono">
+        <div className="bg-surface p-2" />
+        <div className="bg-surface p-2 text-center text-muted-foreground">pred anomaly</div>
+        <div className="bg-surface p-2 text-center text-muted-foreground">pred valid</div>
+        <div className="bg-surface p-2 text-muted-foreground">actual anomaly</div>
+        <div className={`${cell} text-[var(--success)]`}>{tp}</div>
+        <div className={`${cell} text-destructive`}>{fn}</div>
+        <div className="bg-surface p-2 text-muted-foreground">actual valid</div>
+        <div className={`${cell} text-destructive`}>{fp}</div>
+        <div className={`${cell} text-[var(--success)]`}>{tn}</div>
+      </div>
+    </div>
+  );
+}
+
 /* ============================================================ */
 /* TAB · Batch Eval                                             */
 /* ============================================================ */
@@ -1301,6 +1302,21 @@ function nedFromTokens(a: string[], b: string[]): number {
     }
   }
   return dp[m][n] / Math.max(m, n);
+}
+
+// Block-level accuracy (5-step windows, position-aligned) — mirrors backend score.py.
+function blockAccTokens(pred: string[], tru: string[], block = 5): number {
+  if (!tru.length) return pred.length ? 0 : 1;
+  const nb = Math.ceil(tru.length / block);
+  let correct = 0;
+  for (let b = 0; b < nb; b++) {
+    const s = b * block;
+    const e = Math.min((b + 1) * block, tru.length);
+    const t = tru.slice(s, e);
+    const p = s < pred.length ? pred.slice(s, e) : [];
+    if (p.length === t.length && p.every((x, i) => x === t[i])) correct++;
+  }
+  return correct / nb;
 }
 
 function BatchEvalTab() {
@@ -1421,11 +1437,11 @@ function BatchEvalTab() {
   const csvHelp = useMemo(
     () => ({
       nextstep:
-        "Next-step:  EXAMPLE_ID, FAMILY, PARTIAL_SEQUENCE (pipe-separated; optional TRUE_NEXT_STEP)",
+        "Next-step:  EXAMPLE_ID, FAMILY, PARTIAL_SEQUENCE (steps joined by |) · optional TRUE_NEXT_STEP for scoring",
       completion:
-        "Completion: EXAMPLE_ID, FAMILY, PARTIAL_SEQUENCE (optional TRUE_SUFFIX)",
+        "Completion: EXAMPLE_ID, FAMILY, COMPLETION_FRACTION, PARTIAL_SEQUENCE · optional TRUE_SUFFIX for scoring",
       anomaly:
-        "Anomaly:    EXAMPLE_ID, FAMILY, SEQUENCE (optional IS_VALID)",
+        "Anomaly:    EXAMPLE_ID, FAMILY, SEQUENCE · optional IS_VALID, RULE_VIOLATED for scoring",
     }),
     [],
   );
@@ -1526,6 +1542,12 @@ function BatchEvalTab() {
       {result && (
         <>
           <MetricsTable task={result.task} metrics={metrics} />
+
+          {result.task === "anomaly" && (
+            <ConfusionMatrix
+              metrics={result.data.metrics as AnomalyMetrics | null}
+            />
+          )}
 
           <div className="text-tiny font-mono text-muted-foreground">
             {elapsed?.toFixed(0)}ms total ·{" "}
@@ -1718,6 +1740,70 @@ function PerRowAnomaly({ rows }: { rows: AnomalyEval["rows"] }) {
 }
 
 /* ============================================================ */
+/* How judges test (explainer dialog)                          */
+/* ============================================================ */
+
+function HowJudgesTest() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 text-tiny font-mono uppercase tracking-widest text-muted-foreground hover:text-foreground"
+        >
+          <Info className="h-3 w-3" /> How to test
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl gap-0 p-0">
+        <DialogHeader className="border-b border-border p-4">
+          <DialogTitle className="font-mono text-sm uppercase tracking-wide">
+            How to test this model
+          </DialogTitle>
+          <p className="mt-1 text-tiny font-mono text-muted-foreground leading-relaxed">
+            Two ways, both running the live model — the same tasks the challenge is scored on.
+          </p>
+        </DialogHeader>
+        <div className="p-4 space-y-4 text-tiny font-mono text-muted-foreground leading-relaxed max-h-[60vh] overflow-y-auto">
+          <div>
+            <div className="text-foreground uppercase tracking-widest mb-1">
+              A · Single sequence (the tabs above)
+            </div>
+            Load a recipe (MOSFET / IGBT / IC), paste your own, or sample one — then move the step
+            cursor and run any tab:
+            <ul className="mt-1 space-y-0.5">
+              <li>• <span className="text-foreground">Next Step</span> — top-5 ranked next steps + probabilities (Top-1/3/5, MRR).</li>
+              <li>• <span className="text-foreground">Complete</span> — generate the rest of the recipe; scored vs the true remainder (Exact / Token-acc / Block / NED).</li>
+              <li>• <span className="text-foreground">Validate</span> — deterministic check of the 10 process rules.</li>
+              <li>• <span className="text-foreground">Anomaly</span> — valid/invalid + score + NLL + the violated rule.</li>
+            </ul>
+          </div>
+          <div>
+            <div className="text-foreground uppercase tracking-widest mb-1">
+              B · Batch CSV (the Batch Eval tab)
+            </div>
+            Upload the official eval CSV; the model runs every row and reports per-family + overall
+            metrics, an OOD mode, and a downloadable predictions CSV. Expected columns:
+            <ul className="mt-1 space-y-0.5">
+              <li>• <span className="text-foreground">Next-step</span>: EXAMPLE_ID, FAMILY, PARTIAL_SEQUENCE · optional TRUE_NEXT_STEP → Top-1/3/5, MRR</li>
+              <li>• <span className="text-foreground">Completion</span>: EXAMPLE_ID, FAMILY, COMPLETION_FRACTION, PARTIAL_SEQUENCE · optional TRUE_SUFFIX → Exact, NED, Token-acc, Block, Validity</li>
+              <li>• <span className="text-foreground">Anomaly</span>: EXAMPLE_ID, FAMILY, SEQUENCE · optional IS_VALID, RULE_VIOLATED → Acc, P, R, F1, ROC-AUC, Rule-attr + confusion matrix</li>
+            </ul>
+          </div>
+          <div>
+            <div className="text-foreground uppercase tracking-widest mb-1">OOD (the deciding metric)</div>
+            Generalization to an unseen 4th product family is scored post-submission. Batch Eval → OOD
+            mode shows per-held-out-family metrics on any CSV with a FAMILY column.
+          </div>
+          <div className="text-foreground/70">
+            Steps are pipe-separated and must use the model's exact 202-token vocabulary.
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ============================================================ */
 /* Container                                                    */
 /* ============================================================ */
 
@@ -1758,9 +1844,12 @@ export function ProcessLab() {
           <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
             SILICON GPT · PROCESS LAB
           </span>
-          <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
-            inference workstation
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+              inference workstation
+            </span>
+            <HowJudgesTest />
+          </div>
         </div>
 
         <ImportToolbar
