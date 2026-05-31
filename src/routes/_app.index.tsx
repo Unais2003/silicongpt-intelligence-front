@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { MissionHeader } from "@/components/dashboard/MissionHeader";
 import { LiveMetrics } from "@/components/dashboard/LiveMetrics";
 import { ModelArena } from "@/components/dashboard/ModelArena";
-import { BenchmarkArena, BenchmarkRadar } from "@/components/dashboard/BenchmarkArena";
+import { BenchmarkRadar } from "@/components/dashboard/BenchmarkArena";
 import { SectionHeading, PageFooter } from "@/components/dashboard/layout";
 
 export const Route = createFileRoute("/_app/")({
@@ -34,23 +34,14 @@ function Overview() {
       <div className="px-4 md:px-6 lg:px-8 py-8 space-y-10">
         <section>
           <SectionHeading
-            kicker="§ 01 · Arena"
+            kicker="§ 01 · Benchmark · Hack_01 Process Logic"
             title="Head-to-head against frontier LLMs."
-            desc="SiliconGPT — a 1.37M-parameter decoder trained from scratch — versus an n-gram trigram baseline plus frontier LLMs (Gemini 3.5-flash, GPT-5, DeepSeek, Qwen) on semiconductor fab process tasks. Ours + n-gram are scored on the full held-out eval; the LLMs on a 200-example sample."
+            desc="SiliconGPT — a 1.37M-parameter decoder trained from scratch — versus an n-gram trigram baseline plus frontier LLMs (Gemini 3.5-flash, GPT-5, DeepSeek, Qwen) on next-step, completion, and anomaly. Ours + n-gram are scored on the full held-out eval; the LLMs on a 200-example sample."
           />
           <div className="flex flex-col gap-6">
             <ModelArena />
             <BenchmarkRadar />
           </div>
-        </section>
-
-        <section>
-          <SectionHeading
-            kicker="§ 02 · Benchmark"
-            title="Hack_01 Process Logic leaderboard."
-            desc="Next-step top-1, sequence completion token accuracy, and anomaly F1 — scored on 5,200 held-out examples."
-          />
-          <BenchmarkArena />
         </section>
       </div>
 
