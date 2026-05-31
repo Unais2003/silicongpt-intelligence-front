@@ -34,26 +34,6 @@ function LabPage() {
 
       <ProcessLab />
 
-      <div className="px-4 md:px-6 lg:px-8 py-8 space-y-10">
-        <section>
-          <SectionHeading
-            kicker="§ Evaluation"
-            title="Ground truth comparison."
-            desc="Side-by-side alignment between SiliconGPT's decoded recipe and the fab's golden reference sequence."
-          />
-          <GroundTruthComparison />
-        </section>
-
-        <section>
-          <SectionHeading
-            kicker="§ Generalization"
-            title="Out-of-distribution device families."
-            desc="Trained on 14 process families, evaluated on 6 held-out ones. The model transfers learned grammar to unseen technologies."
-          />
-          <OODDashboard />
-        </section>
-      </div>
-
       <PageFooter />
     </main>
   );
