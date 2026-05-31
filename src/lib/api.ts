@@ -6,7 +6,7 @@
 const BASE =
   (import.meta as unknown as { env?: { VITE_BACKEND_URL?: string } }).env
     ?.VITE_BACKEND_URL ??
-  "https://6a51c6c475f11a13-131-175-44-1.serveousercontent.com";
+  "https://neo-ballot-mine-resolution.trycloudflare.com";
 
 async function jpost<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(`${BASE}${path}`, {
