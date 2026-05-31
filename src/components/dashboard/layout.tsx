@@ -1,4 +1,45 @@
+import { useEffect, useState } from "react";
 import { StatusDot } from "./primitives";
+import { api } from "@/lib/api";
+
+function BackendStatusBadge() {
+  const [state, setState] = useState<"checking" | "online" | "offline">("checking");
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .health()
+      .then((h) => !cancelled && setState(h?.ok ? "online" : "offline"))
+      .catch(() => !cancelled && setState("offline"));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const online = state === "online";
+  const checking = state === "checking";
+  const tone = checking ? "warning" : online ? "success" : "warning";
+  const label = checking ? "CHECKING BACKEND…" : online ? "BACKEND ONLINE" : "BACKEND OFFLINE";
+  const colorClass = checking
+    ? "text-[var(--warning)] border-[var(--warning)]/40"
+    : online
+      ? "text-[var(--success)] border-[var(--success)]/40"
+      : "text-red-500 border-red-500/40";
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <div className={`flex items-center gap-2 px-3 py-1.5 border bg-card ${colorClass}`}>
+        <StatusDot color={online ? "success" : checking ? "warning" : "warning"} />
+        <span className="font-mono text-tiny uppercase tracking-widest">{label}</span>
+      </div>
+      {state === "offline" && (
+        <span className="font-mono text-tiny text-muted-foreground">
+          run the backend to enable inference
+        </span>
+      )}
+    </div>
+  );
+}
+
 
 export function SectionHeading({
   kicker,
@@ -45,12 +86,14 @@ export function PageHeader({
           <h1 className="font-serif text-4xl md:text-5xl mt-1 leading-[1.05]">{title}</h1>
           <p className="text-sm text-muted-foreground mt-3 leading-relaxed">{desc}</p>
         </div>
-        {status && (
+        {status === "__backend__" ? (
+          <BackendStatusBadge />
+        ) : status ? (
           <div className="flex items-center gap-2 px-3 py-1.5 border border-border bg-card">
             <StatusDot color="success" />
             <span className="font-mono text-tiny uppercase tracking-widest">{status}</span>
           </div>
-        )}
+        ) : null}
       </div>
     </header>
   );

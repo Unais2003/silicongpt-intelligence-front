@@ -1755,17 +1755,8 @@ export function ProcessLab() {
           <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
             SILICON GPT · PROCESS LAB
           </span>
-          <span className="flex items-center gap-2">
-            <StatusDot color={healthTone} />
-            <span
-              className={`text-tiny font-mono ${
-                healthTone === "warning"
-                  ? "text-[var(--warning)]"
-                  : "text-[var(--success)]"
-              }`}
-            >
-              {healthLabel}
-            </span>
+          <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+            inference workstation
           </span>
         </div>
 
