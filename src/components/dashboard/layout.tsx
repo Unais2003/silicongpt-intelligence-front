@@ -86,12 +86,14 @@ export function PageHeader({
           <h1 className="font-serif text-4xl md:text-5xl mt-1 leading-[1.05]">{title}</h1>
           <p className="text-sm text-muted-foreground mt-3 leading-relaxed">{desc}</p>
         </div>
-        {status && (
+        {status === "__backend__" ? (
+          <BackendStatusBadge />
+        ) : status ? (
           <div className="flex items-center gap-2 px-3 py-1.5 border border-border bg-card">
             <StatusDot color="success" />
             <span className="font-mono text-tiny uppercase tracking-widest">{status}</span>
           </div>
-        )}
+        ) : null}
       </div>
     </header>
   );
