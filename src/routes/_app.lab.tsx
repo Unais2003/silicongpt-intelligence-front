@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ProcessLab } from "@/components/dashboard/ProcessLab";
-import { GroundTruthComparison } from "@/components/dashboard/GroundTruthComparison";
-import { OODDashboard } from "@/components/dashboard/OODDashboard";
-import { SectionHeading, PageFooter, PageHeader } from "@/components/dashboard/layout";
+import { PageFooter, PageHeader } from "@/components/dashboard/layout";
 
 export const Route = createFileRoute("/_app/lab")({
   head: () => ({
