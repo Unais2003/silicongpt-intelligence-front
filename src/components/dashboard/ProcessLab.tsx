@@ -810,7 +810,10 @@ function CompleteTab({
   };
 
   useEffect(() => {
-    run();
+    stop();
+    setOut([]);
+    setError(null);
+    setLatency(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, dataset.id, steps.join("|")]);
 
