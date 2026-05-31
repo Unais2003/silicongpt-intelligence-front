@@ -72,19 +72,19 @@ export function MissionHeader() {
         <div className="ticker-track flex gap-8 whitespace-nowrap pl-24 text-tiny font-mono text-muted-foreground">
           {Array.from({ length: 2 }).map((_, k) => (
             <div key={k} className="flex gap-8">
-              <span><span className="text-[var(--success)]">▲</span> TOP-1 80.7%</span>
+              <span><span className="text-[var(--success)]">▲</span> TOP-1 81.1%</span>
               <span><span className="text-[var(--success)]">▲</span> TOP-5 100.0%</span>
-              <span><span className="text-[var(--warning)]">●</span> OOD 49.5%</span>
-              <span><span className="text-[var(--success)]">▲</span> VALIDITY 99.7%</span>
-              <span><span className="text-[var(--success)]">▲</span> ROC-AUC 0.997</span>
+              <span><span className="text-[var(--warning)]">●</span> OOD 50.3%</span>
+              <span><span className="text-[var(--success)]">▲</span> VALIDITY 99.0%</span>
+              <span><span className="text-[var(--success)]">▲</span> ROC-AUC 0.995</span>
               <span>VOCAB 202 tokens</span>
               <span>CONTEXT 256</span>
-              <span>PARAMS 25.31M</span>
+              <span>PARAMS 1.37M</span>
               <span>TRAIN 60K sequences</span>
               <span>FAMILIES 3 — mosfet · igbt · ic</span>
               <span>GPU A100 64GB ×1</span>
               <span>STEP/s 1,842</span>
-              <span>VAL-LOSS 0.3090</span>
+              <span>VAL-LOSS 0.3289</span>
               <span>GRAD-NORM 0.41</span>
             </div>
           ))}

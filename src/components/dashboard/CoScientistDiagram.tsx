@@ -425,9 +425,9 @@ function ResultsTable() {
 
 function ArchitectureDiff() {
   const rows: { prop: string; before: string; after: string }[] = [
-    { prop: "Size", before: "25M · 8L · d=512", after: "~3M · 3L · d=192" },
-    { prop: "OOD top-1", before: "0.4947", after: "0.512 (+0.017)" },
-    { prop: "In-dist top-1", before: "0.807", after: "~0.81" },
+    { prop: "Size", before: "25M · 8L · d=512", after: "1.37M · 3L · d=192" },
+    { prop: "OOD top-1", before: "0.4947", after: "0.5031 (+0.008, 3-seed mean)" },
+    { prop: "In-dist top-1", before: "0.807", after: "0.811" },
     { prop: "Augmentation", before: "—", after: "none (rejected)" },
     { prop: "Weight-sharing", before: "no", after: "no (rejected)" },
   ];

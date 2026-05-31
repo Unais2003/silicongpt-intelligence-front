@@ -8,44 +8,21 @@ type Row = {
   top1: number;
   top5: number;
   ood: number | null;
-  completion: number;
+  completion: number | null;
   anomalyF1: number | null;
-  latency: number; // ms
+  latency: number | null; // ms
   us?: boolean;
 };
 
+// Real measured numbers (score.py). Ours + n-gram = FULL eval (n=3600/600/1000);
+// frontier LLMs sampled on 200 examples. OOD = held-out-family proxy (3-seed mean), trained model only.
 const MODELS: Row[] = [
-  {
-    name: "SiliconGPT",
-    org: "ours · 25.31M",
-    top1: 80.7,
-    top5: 100.0,
-    ood: 49.5,
-    completion: 40.0,
-    anomalyF1: 1.0,
-    latency: 14,
-    us: true,
-  },
-  {
-    name: "N-gram (trigram)",
-    org: "baseline · no params",
-    top1: 76.1,
-    top5: 100.0,
-    ood: null,
-    completion: 28.3,
-    anomalyF1: null,
-    latency: 1,
-  },
-  {
-    name: "Gemini 3.5-flash",
-    org: "Google · API",
-    top1: 44.0,
-    top5: 76.0,
-    ood: null,
-    completion: 6.5,
-    anomalyF1: 0.842,
-    latency: 2800,
-  },
+  { name: "SiliconGPT",       org: "ours · 1.37M",            top1: 81.1, top5: 100.0, ood: 50.3, completion: 40.5, anomalyF1: 1.0,   latency: 14,   us: true },
+  { name: "N-gram (trigram)", org: "baseline · no params",    top1: 76.1, top5: 100.0, ood: null, completion: 28.3, anomalyF1: null,  latency: 1 },
+  { name: "Gemini 3.5-flash", org: "Google · API",            top1: 55.5, top5: 78.0,  ood: null, completion: 7.6,  anomalyF1: 0.910, latency: null },
+  { name: "GPT-5",            org: "OpenAI · API",            top1: 52.5, top5: 72.0,  ood: null, completion: null, anomalyF1: null,  latency: null },
+  { name: "DeepSeek V3-0324", org: "DeepSeek · open weights",  top1: 48.0, top5: 65.0,  ood: null, completion: 5.6,  anomalyF1: 0.603, latency: null },
+  { name: "Qwen3.6-35B-A3B",  org: "Alibaba · open weights",   top1: 41.5, top5: 63.5,  ood: null, completion: 2.5,  anomalyF1: 0.690, latency: null },
 ];
 
 const COLS: {
@@ -89,7 +66,7 @@ export function ModelArena() {
       title="Model Arena · Hack_01 Process Logic Benchmark"
       meta={
         <span className="flex items-center gap-2">
-          <StatusDot color="success" /> 3 systems · 5,200 examples · next-step + completion + anomaly
+          <StatusDot color="success" /> 6 systems · 5,200 eval (ours, n-gram) · 200-sample (LLMs) · next-step + completion + anomaly
         </span>
       }
     >
@@ -165,7 +142,7 @@ export function ModelArena() {
       <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-px bg-border border border-border">
         <div className="bg-card p-3">
           <div className="text-tiny font-mono text-muted-foreground">vs GEMINI · TOP-1</div>
-          <div className="font-mono text-lg tabular text-[var(--success)]">+36.7 pt</div>
+          <div className="font-mono text-lg tabular text-[var(--success)]">+25.6 pt</div>
         </div>
         <div className="bg-card p-3">
           <div className="text-tiny font-mono text-muted-foreground">API COST</div>

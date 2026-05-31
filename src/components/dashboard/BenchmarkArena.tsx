@@ -9,27 +9,30 @@ type Row = {
   top1: number;
   top5: number;
   ood: number | null;
-  completion: number;
+  completion: number | null;
   anomalyF1: number | null;
-  latency: number;
+  latency: number | null;
   us?: boolean;
 };
 
+// Real measured numbers (src/process_logic/score.py). Ours + n-gram = FULL held-out eval
+// (n=3600 next-step / 600 completion / 1000 anomaly); frontier LLMs sampled on 200 examples (cost).
+// OOD = held-out-family proxy (3-seed mean) — applies to our trained model only. "—" = not measured.
 const MODELS: Row[] = [
-  { rank: 1, name: "SiliconGPT",       org: "ours · 25.31M",        top1: 80.7, top5: 100.0, ood: 49.5, completion: 40.0, anomalyF1: 1.000, latency: 14,   us: true },
-  { rank: 2, name: "N-gram (trigram)", org: "baseline · no params", top1: 76.1, top5: 100.0, ood: null, completion: 28.3, anomalyF1: null,  latency: 1 },
-  { rank: 3, name: "Gemini 3.5-flash", org: "Google · API",         top1: 44.0, top5: 76.0,  ood: null, completion: 6.5,  anomalyF1: 0.842, latency: 2800 },
-  { rank: 4, name: "GPT-5",            org: "OpenAI · API",         top1: 0,    top5: 0,     ood: null, completion: 0,    anomalyF1: null,  latency: 0 },
-  { rank: 5, name: "Qwen3.6-35B-A3B",  org: "Alibaba · open weights", top1: 0,  top5: 0,     ood: null, completion: 0,    anomalyF1: null,  latency: 0 },
-  { rank: 6, name: "DeepSeek V3-0324", org: "DeepSeek · open weights", top1: 0, top5: 0,     ood: null, completion: 0,    anomalyF1: null,  latency: 0 },
+  { rank: 1, name: "SiliconGPT",       org: "ours · 1.37M",           top1: 81.1, top5: 100.0, ood: 50.3, completion: 40.5, anomalyF1: 1.000, latency: 14,   us: true },
+  { rank: 2, name: "N-gram (trigram)", org: "baseline · no params",   top1: 76.1, top5: 100.0, ood: null, completion: 28.3, anomalyF1: null,  latency: 1 },
+  { rank: 3, name: "Gemini 3.5-flash", org: "Google · API",           top1: 55.5, top5: 78.0,  ood: null, completion: 7.6,  anomalyF1: 0.910, latency: null },
+  { rank: 4, name: "GPT-5",            org: "OpenAI · API",           top1: 52.5, top5: 72.0,  ood: null, completion: null, anomalyF1: null,  latency: null },
+  { rank: 5, name: "DeepSeek V3-0324", org: "DeepSeek · open weights", top1: 48.0, top5: 65.0,  ood: null, completion: 5.6,  anomalyF1: 0.603, latency: null },
+  { rank: 6, name: "Qwen3.6-35B-A3B",  org: "Alibaba · open weights",  top1: 41.5, top5: 63.5,  ood: null, completion: 2.5,  anomalyF1: 0.690, latency: null },
 ];
 
 const RADAR = [
-  { axis: "Top-1",      SiliconGPT: 81,  Frontier: 44 },
-  { axis: "Top-5",      SiliconGPT: 100, Frontier: 76 },
+  { axis: "Top-1",      SiliconGPT: 81,  Frontier: 56 },
+  { axis: "Top-5",      SiliconGPT: 100, Frontier: 78 },
   { axis: "OOD",        SiliconGPT: 50,  Frontier: 0 },
   { axis: "Validity",   SiliconGPT: 100, Frontier: 92 },
-  { axis: "Anomaly F1", SiliconGPT: 100, Frontier: 84 },
+  { axis: "Anomaly F1", SiliconGPT: 100, Frontier: 91 },
   { axis: "Latency",    SiliconGPT: 95,  Frontier: 10 },
 ];
 
@@ -67,7 +70,7 @@ export function BenchmarkArena() {
   return (
     <Panel
       title="Benchmark · Hack_01 Process Logic"
-      meta={<span className="flex items-center gap-2"><StatusDot color="success" /> 3 SYSTEMS · 5,200 EXAMPLES</span>}
+      meta={<span className="flex items-center gap-2"><StatusDot color="success" /> 6 SYSTEMS · 5,200 EVAL (ours, n-gram) · 200-SAMPLE (LLMs)</span>}
     >
       <div className="border border-border">
         <div className="grid grid-cols-[40px_1fr_70px_70px_70px_90px_80px] gap-2 px-3 py-2 border-b border-border bg-surface text-tiny font-mono uppercase text-muted-foreground">
@@ -103,7 +106,7 @@ export function BenchmarkArena() {
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-px bg-border border border-border">
-        <div className="bg-card p-2"><div className="text-tiny font-mono text-muted-foreground">vs GEMINI · TOP-1</div><div className="font-mono text-lg tabular text-[var(--success)]">+36.7 pt</div></div>
+        <div className="bg-card p-2"><div className="text-tiny font-mono text-muted-foreground">vs GEMINI · TOP-1</div><div className="font-mono text-lg tabular text-[var(--success)]">+25.6 pt</div></div>
         <div className="bg-card p-2"><div className="text-tiny font-mono text-muted-foreground">API COST</div><div className="font-mono text-lg tabular">no cost vs Gemini</div></div>
         <div className="bg-card p-2"><div className="text-tiny font-mono text-muted-foreground">ANOMALY F1</div><div className="font-mono text-lg tabular text-[var(--success)]">1.000</div></div>
       </div>

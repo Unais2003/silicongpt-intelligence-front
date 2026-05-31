@@ -36,7 +36,7 @@ function Overview() {
           <SectionHeading
             kicker="§ 01 · Arena"
             title="Head-to-head against frontier LLMs."
-            desc="SiliconGPT — a 25.31M-parameter decoder trained from scratch — versus an n-gram trigram baseline and Gemini 3.5-flash on semiconductor fab process tasks. These are the three systems actually evaluated on our eval set."
+            desc="SiliconGPT — a 1.37M-parameter decoder trained from scratch — versus an n-gram trigram baseline plus frontier LLMs (Gemini 3.5-flash, GPT-5, DeepSeek, Qwen) on semiconductor fab process tasks. Ours + n-gram are scored on the full held-out eval; the LLMs on a 200-example sample."
           />
           <div className="flex flex-col gap-6">
             <ModelArena />

@@ -26,11 +26,11 @@ function Spark({ data, color }: { data: { x: number; y: number }[]; color: strin
 }
 
 const metrics = [
-  { label: "Top-1 Accuracy", value: "80.7", suffix: "%", delta: "+2.4 vs prev checkpoint", tone: "default" as const, color: "var(--primary)", spark: spark(1) },
+  { label: "Top-1 Accuracy", value: "81.1", suffix: "%", delta: "+0.4 vs 25M baseline", tone: "default" as const, color: "var(--primary)", spark: spark(1) },
   { label: "Top-5 Accuracy", value: "100.0", suffix: "%", delta: "saturated · 3 families", tone: "success" as const, color: "oklch(0.6 0.16 150)", spark: spark(2) },
-  { label: "OOD Accuracy", value: "49.5", suffix: "%", delta: "held-out · IC family", tone: "warning" as const, color: "oklch(0.72 0.16 75)", spark: spark(0.5) },
-  { label: "Completion Validity", value: "99.7", suffix: "%", delta: "constraint-checked", tone: "success" as const, color: "oklch(0.6 0.16 150)", spark: spark(3) },
-  { label: "ROC-AUC", value: "0.997", suffix: "", delta: "binary process validity", tone: "default" as const, color: "var(--primary)", spark: spark(4) },
+  { label: "OOD Accuracy", value: "50.3", suffix: "%", delta: "held-out family · 3-seed mean", tone: "warning" as const, color: "oklch(0.72 0.16 75)", spark: spark(0.5) },
+  { label: "Completion Validity", value: "99.0", suffix: "%", delta: "constraint-checked", tone: "success" as const, color: "oklch(0.6 0.16 150)", spark: spark(3) },
+  { label: "ROC-AUC", value: "0.995", suffix: "", delta: "binary process validity", tone: "default" as const, color: "var(--primary)", spark: spark(4) },
 ];
 
 export function LiveMetrics() {

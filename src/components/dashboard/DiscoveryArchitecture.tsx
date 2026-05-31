@@ -701,10 +701,10 @@ function Section5Search() {
 // ─── SECTION 6 · SCIENTIFIC CONCLUSIONS ────────────────────────────────────
 
 const FINDINGS: { title: string; desc: string; verdict: "VALIDATED" | "REJECTED" }[] = [
-  { title: "Smaller models generalize better", desc: "OOD top-1 improves as parameters drop from 25M → 3M.", verdict: "VALIDATED" },
+  { title: "Smaller models generalize better", desc: "OOD top-1 improves as parameters drop from 25M → 1.37M.", verdict: "VALIDATED" },
   { title: "Description-init embeddings", desc: "Initializing from token descriptions hurt OOD by 0.018.", verdict: "REJECTED" },
   { title: "Cross-family data augmentation", desc: "Synthetic mixing degraded both OOD and in-distribution.", verdict: "REJECTED" },
-  { title: "Weight-sharing at 3M", desc: "Tied transformer blocks lost 0.009 OOD top-1.", verdict: "REJECTED" },
+  { title: "Weight-sharing at 1.37M", desc: "Tied transformer blocks lost 0.009 OOD top-1.", verdict: "REJECTED" },
   { title: "Constrained decoding", desc: "Hard masking did not improve measured downstream metrics.", verdict: "REJECTED" },
   { title: "Parameter reduction", desc: "The only lever that produced a measured OOD gain.", verdict: "VALIDATED" },
 ];
