@@ -29,7 +29,7 @@ function LabPage() {
         kicker="§ 02 · Process Intelligence Lab"
         title="Inference workstation."
         desc="Run SiliconGPT against real wafer fabrication recipes. Predict next steps, complete sequences, validate constraints, surface anomalies."
-        status="LIVE INFERENCE"
+        status="__backend__"
       />
 
       <ProcessLab />
