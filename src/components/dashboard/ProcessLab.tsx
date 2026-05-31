@@ -810,7 +810,10 @@ function CompleteTab({
   };
 
   useEffect(() => {
-    run();
+    stop();
+    setOut([]);
+    setError(null);
+    setLatency(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, dataset.id, steps.join("|")]);
 
@@ -849,7 +852,7 @@ function CompleteTab({
           disabled={running}
           className="bg-foreground text-background font-mono text-xs uppercase tracking-widest px-3 py-1.5 hover:bg-[var(--info)] disabled:opacity-50"
         >
-          ▶ Run Again
+          ▶ {out.length > 0 ? "Run Again" : "Run"}
         </button>
         {running && (
           <button
