@@ -3,6 +3,7 @@ import { MissionHeader } from "@/components/dashboard/MissionHeader";
 import { LiveMetrics } from "@/components/dashboard/LiveMetrics";
 import { ModelArena } from "@/components/dashboard/ModelArena";
 import { BenchmarkRadar } from "@/components/dashboard/BenchmarkArena";
+import { SystemPromptDialog } from "@/components/dashboard/SystemPromptDialog";
 import { SectionHeading, PageFooter } from "@/components/dashboard/layout";
 
 export const Route = createFileRoute("/_app/")({
@@ -38,6 +39,9 @@ function Overview() {
             title="Head-to-head against frontier LLMs."
             desc="A 1.37M from-scratch decoder vs. an n-gram baseline and four frontier LLMs — on next-step, completion, and anomaly."
           />
+          <div className="mt-3 mb-5">
+            <SystemPromptDialog />
+          </div>
           <div className="flex flex-col gap-6">
             <ModelArena />
             <BenchmarkRadar />
