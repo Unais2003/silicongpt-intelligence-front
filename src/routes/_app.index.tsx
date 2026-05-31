@@ -36,7 +36,7 @@ function Overview() {
           <SectionHeading
             kicker="§ 01 · Benchmark · Hack_01 Process Logic"
             title="Head-to-head against frontier LLMs."
-            desc="SiliconGPT — a 1.37M-parameter decoder trained from scratch — versus an n-gram trigram baseline plus frontier LLMs (Gemini 3.5-flash, GPT-5, DeepSeek, Qwen) on next-step, completion, and anomaly. Ours + n-gram are scored on the full held-out eval; the LLMs on a 200-example sample."
+            desc="A 1.37M from-scratch decoder vs. an n-gram baseline and four frontier LLMs — on next-step, completion, and anomaly."
           />
           <div className="flex flex-col gap-6">
             <ModelArena />
