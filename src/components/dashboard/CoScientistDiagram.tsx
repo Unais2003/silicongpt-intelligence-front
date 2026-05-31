@@ -1,210 +1,214 @@
-type NodeAccent =
-  | "config"
-  | "supervisor"
-  | "agent"
-  | "experiment"
-  | "final";
+// ---------------------------------------------------------------------------
+// Panel 1: Multi-agent discovery loop (2D block diagram)
+// Mirrors the Google AI co-scientist reference layout, extended with our
+// GPU Experiment Agent as a 7th specialist inside the same box.
+// ---------------------------------------------------------------------------
 
-const ACCENT: Record<NodeAccent, string> = {
-  config: "border-emerald-600 bg-emerald-950/20",
-  supervisor: "border-border-strong bg-surface font-semibold",
-  agent: "border-border bg-card",
-  experiment: "border-amber-500 border-2 bg-amber-950/20",
-  final: "border-blue-600 bg-blue-950/20",
-};
-
-type AgentNode = {
-  n: string;
+function Chip({
+  label,
+  sub,
+  tone = "agent",
+  badge,
+  className = "",
+}: {
   label: string;
-  glyph: string;
-  detail: string;
-  accent: NodeAccent;
+  sub?: string;
+  tone?: "agent" | "io" | "orchestrator" | "experiment" | "feedback";
   badge?: string;
-};
-
-const NODES: AgentNode[] = [
-  {
-    n: "0",
-    label: "CONFIG",
-    glyph: "⚙",
-    accent: "config",
-    detail:
-      "Research goal + evaluation rubric — the one knob that retargets the engine",
-  },
-  {
-    n: "1",
-    label: "SUPERVISOR",
-    glyph: "⬡",
-    accent: "supervisor",
-    detail: "Orchestrates each round · assigns agents · decides when to stop",
-  },
-  {
-    n: "2",
-    label: "GENERATION",
-    glyph: "💡",
-    accent: "agent",
-    detail:
-      "Proposes novel, testable hypotheses grounded in literature + prior lessons",
-  },
-  {
-    n: "3",
-    label: "REFLECTION",
-    glyph: "🔍",
-    accent: "agent",
-    detail:
-      "Peer-reviews each idea · filters flawed/non-novel · triages: config-expressible vs needs-code",
-  },
-  {
-    n: "4",
-    label: "EXPERIMENT",
-    glyph: "🧪",
-    accent: "experiment",
-    badge: "NEW",
-    detail:
-      "Trains + benchmarks each idea on GPU — smoke run → full 3-fold OOD on A100 — writes a measured result record",
-  },
-  {
-    n: "5",
-    label: "PROXIMITY",
-    glyph: "⬡",
-    accent: "agent",
-    detail:
-      "Clusters and de-duplicates hypotheses so the tournament doesn't re-test the same idea",
-  },
-  {
-    n: "6",
-    label: "RANKING",
-    glyph: "🏆",
-    accent: "agent",
-    detail: "Elo tournament · pairwise debates · measured > simulated > reasoned",
-  },
-  {
-    n: "7",
-    label: "EVOLUTION",
-    glyph: "🧬",
-    accent: "agent",
-    detail: "Combines + refines the top-ranked ideas into brand-new hypotheses",
-  },
-  {
-    n: "8",
-    label: "META-REVIEW",
-    glyph: "📝",
-    accent: "agent",
-    detail:
-      "Synthesizes each round's lessons · fed back into every agent next round ('learning without back-propagation')",
-  },
-  {
-    n: "9",
-    label: "FINAL OUTPUT",
-    glyph: "🎯",
-    accent: "final",
-    detail: "Ranked hypothesis board + research overview + chosen architecture",
-  },
-];
-
-function Node({ node }: { node: AgentNode }) {
+  className?: string;
+}) {
+  const toneCls = {
+    agent: "border-border bg-card",
+    io: "border-blue-600/60 bg-blue-950/20",
+    orchestrator: "border-border-strong bg-surface",
+    experiment: "border-amber-500 border-2 bg-amber-950/20",
+    feedback: "border-blue-600/40 bg-blue-950/10",
+  }[tone];
   return (
-    <div
-      className={`relative w-full max-w-md px-4 py-3 border ${ACCENT[node.accent]} flex items-start gap-3`}
-    >
-      <div className="text-lg leading-none mt-0.5">{node.glyph}</div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-tiny uppercase tracking-widest text-muted-foreground">
-            {node.n.padStart(2, "0")}
-          </span>
-          <span className="font-medium text-sm text-foreground">
-            {node.label}
-          </span>
-          {node.badge && (
-            <span className="bg-amber-500 text-black font-mono text-[10px] px-1.5 py-0.5 uppercase">
-              {node.badge}
-            </span>
-          )}
-        </div>
-        <div className="text-xs text-muted-foreground leading-relaxed mt-1">
-          {node.detail}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Arrow({ label }: { label?: string }) {
-  return (
-    <div className="flex flex-col items-center text-muted-foreground py-1">
-      <div className="text-sm leading-none">▼</div>
-      {label && (
-        <div className="font-mono text-tiny uppercase tracking-widest mt-1">
+    <div className={`px-3 py-2 border ${toneCls} ${className}`}>
+      <div className="flex items-center gap-2">
+        <div className="font-medium text-xs text-foreground leading-tight">
           {label}
+        </div>
+        {badge && (
+          <span className="bg-amber-500 text-black font-mono text-[9px] px-1 py-px uppercase">
+            {badge}
+          </span>
+        )}
+      </div>
+      {sub && (
+        <div className="text-[10px] text-muted-foreground leading-snug mt-0.5">
+          {sub}
         </div>
       )}
     </div>
   );
 }
 
-function ForkBetweenReflectionAndExperiment() {
+const SPECIALIST_ROWS: { a: { label: string; sub: string }; b: { label: string; sub: string } }[] = [
+  {
+    a: { label: "Generation", sub: "Propose novel hypotheses" },
+    b: { label: "Proximity", sub: "Cluster / de-duplicate" },
+  },
+  {
+    a: { label: "Reflection", sub: "Peer-review & triage" },
+    b: { label: "Meta-review", sub: "Synthesize round lessons" },
+  },
+  {
+    a: { label: "Ranking", sub: "Elo tournament · pairwise" },
+    b: { label: "Evolution", sub: "Recombine top ideas" },
+  },
+];
+
+function SpecialistsBox() {
   return (
-    <div className="w-full max-w-md flex items-stretch gap-3 py-2 text-muted-foreground">
-      <div className="flex-1 flex flex-col items-center">
-        <div className="text-sm leading-none">▼</div>
-        <div className="font-mono text-tiny uppercase tracking-widest mt-1 text-center">
-          config-expressible
-        </div>
+    <div className="border border-border-strong bg-card/40 p-4">
+      <div className="font-mono text-tiny uppercase tracking-widest text-muted-foreground mb-3">
+        AI co-scientist · specialized agents
       </div>
-      <div className="flex-1 flex flex-col items-center">
-        <div className="text-sm leading-none">▼</div>
-        <div className="font-mono text-tiny uppercase tracking-widest mt-1 text-center">
-          needs new code
+
+      <div className="space-y-1">
+        {SPECIALIST_ROWS.map((row, i) => (
+          <div key={row.a.label}>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <Chip label={row.a.label} sub={row.a.sub} />
+              <div className="text-red-500/70 text-sm select-none text-center">⇄</div>
+              <Chip label={row.b.label} sub={row.b.sub} />
+            </div>
+            {i < SPECIALIST_ROWS.length - 1 && (
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-1 text-red-500/60 text-sm">
+                <span className="text-center">⇅</span>
+                <span className="opacity-50">╳</span>
+                <span className="text-center">⇅</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* GPU Experiment Agent — our addition */}
+      <div className="mt-4 pt-4 border-t border-dashed border-amber-500/40">
+        <div className="font-mono text-[9px] uppercase tracking-widest text-amber-500/80 mb-2">
+          + our addition · 7th specialist
         </div>
-        <div className="mt-2 px-2 py-1 border border-border bg-card font-mono text-tiny uppercase tracking-widest text-foreground">
-          BUILD KNOB
-        </div>
-        <div className="text-sm leading-none mt-1">▼</div>
+        <Chip
+          tone="experiment"
+          badge="NEW"
+          label="GPU Experiment Agent"
+          sub="Trains + benchmarks each idea on GPU · smoke run → full 3-fold OOD on A100 · writes measured result to Context Memory"
+        />
       </div>
     </div>
   );
 }
 
-function MainPipeline() {
+function DiscoveryLoopDiagram() {
   return (
-    <div className="relative flex flex-col items-center">
-      {/* Feedback loop dashed line on the left */}
-      <div
-        className="hidden md:flex absolute top-[12%] bottom-[12%] left-2 lg:left-6 flex-col items-center pointer-events-none"
-        aria-hidden
-      >
-        <div className="text-muted-foreground text-sm leading-none">▲</div>
-        <div className="flex-1 border-l border-dashed border-border-strong" />
-        <div className="mt-2 -ml-4 lg:-ml-2 rotate-[-90deg] font-mono text-tiny uppercase tracking-widest text-muted-foreground whitespace-nowrap">
-          next round · meta-review feeds every agent
+    <div className="space-y-4">
+      {/* TOP ROW: Scientist → Research goal → Configuration → Supervisor → Research overview */}
+      <div className="hidden lg:grid grid-cols-[auto_16px_auto_16px_auto_16px_auto_16px_1fr] items-center gap-1">
+        <Chip tone="orchestrator" label="Scientist" sub="human-in-the-loop" />
+        <span className="text-muted-foreground text-center">▶</span>
+        <Chip tone="io" label="Research goal" />
+        <span className="text-muted-foreground text-center">▶</span>
+        <Chip tone="agent" label="Configuration" sub="evaluation rubric" />
+        <span className="text-muted-foreground text-center">▶</span>
+        <Chip tone="orchestrator" label="Supervisor agent" sub="orchestrates rounds" />
+        <span className="text-muted-foreground text-center">▶</span>
+        <Chip
+          tone="io"
+          label="Research overview"
+          sub="ranked hypotheses + chosen architecture"
+        />
+      </div>
+
+      {/* Feedback arc */}
+      <div className="hidden lg:flex items-center gap-2 text-muted-foreground">
+        <span className="text-xs">◀</span>
+        <div className="flex-1 border-t border-dashed border-border-strong" />
+        <span className="font-mono text-[9px] uppercase tracking-widest">
+          feedback loop · Scientist reviews & re-runs
+        </span>
+        <div className="flex-1 border-t border-dashed border-border-strong" />
+      </div>
+
+      {/* MIDDLE: feedback | specialists | workers */}
+      <div className="hidden lg:grid grid-cols-[170px_24px_1fr_24px_180px] gap-2 items-stretch">
+        <div className="flex flex-col justify-center">
+          <Chip tone="feedback" label="Additional feedback" sub="from scientist" />
+          <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mt-2 text-center">
+            ─── feeds reflection ───▶
+          </div>
+        </div>
+        <div className="flex items-center justify-center text-muted-foreground text-lg">▶</div>
+
+        <div className="flex flex-col">
+          <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-1 text-center">
+            ▼ assign agents to workers
+          </div>
+          <SpecialistsBox />
+        </div>
+
+        <div className="flex flex-col items-center justify-around text-muted-foreground text-sm">
+          <span>◀──▶</span>
+          <span className="font-mono text-[9px] uppercase tracking-wider rotate-90 whitespace-nowrap">
+            dispatch · results
+          </span>
+          <span>◀──▶</span>
+        </div>
+
+        <div className="flex flex-col gap-3 justify-between">
+          <div className="border border-border-strong bg-surface">
+            <div className="px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground border-b border-border">
+              GPU workers
+            </div>
+            <div className="px-2 py-1 text-xs text-foreground">Worker · A100</div>
+            <div className="px-2 py-1 text-xs text-foreground border-t border-border">Worker · A100</div>
+            <div className="px-2 py-1 text-xs text-foreground border-t border-border">Worker · A100</div>
+            <div className="px-2 py-1 text-xs text-foreground border-t border-border">Worker · A100</div>
+          </div>
+          <Chip
+            tone="orchestrator"
+            label="Context Memory"
+            sub="measured results · round lessons"
+          />
         </div>
       </div>
 
-      {NODES.slice(0, 4).map((node, i) => (
-        <div key={node.n} className="w-full flex flex-col items-center">
-          <Node node={node} />
-          {i < 3 && <Arrow />}
+      {/* MOBILE / TABLET fallback — vertical stack */}
+      <div className="lg:hidden flex flex-col items-stretch gap-2">
+        <Chip tone="orchestrator" label="Scientist" sub="human-in-the-loop" />
+        <div className="text-center text-muted-foreground text-xs">▼</div>
+        <Chip tone="io" label="Research goal" />
+        <div className="text-center text-muted-foreground text-xs">▼</div>
+        <Chip tone="agent" label="Configuration" sub="evaluation rubric" />
+        <div className="text-center text-muted-foreground text-xs">▼</div>
+        <Chip tone="orchestrator" label="Supervisor agent" sub="assigns agents to workers" />
+        <div className="text-center text-muted-foreground text-xs">▼</div>
+        <Chip tone="feedback" label="Additional feedback" sub="from scientist · feeds reflection" />
+        <div className="text-center text-muted-foreground text-xs">▼</div>
+        <SpecialistsBox />
+        <div className="text-center text-muted-foreground text-xs">▼ dispatch · results</div>
+        <div className="border border-border-strong bg-surface">
+          <div className="px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground border-b border-border">
+            GPU workers
+          </div>
+          <div className="px-2 py-1 text-xs text-foreground">Worker · A100 × 4</div>
         </div>
-      ))}
-
-      <ForkBetweenReflectionAndExperiment />
-
-      {/* EXPERIMENT */}
-      <Node node={NODES[4]} />
-      <Arrow />
-      <Node node={NODES[5]} />
-      <Arrow />
-      <Node node={NODES[6]} />
-      <Arrow />
-      <Node node={NODES[7]} />
-      <Arrow />
-      <Node node={NODES[8]} />
-      <Arrow label="plateau / max rounds reached" />
-      <Node node={NODES[9]} />
+        <Chip tone="orchestrator" label="Context Memory" sub="measured results · round lessons" />
+        <div className="text-center text-muted-foreground text-xs">▼</div>
+        <Chip tone="io" label="Research overview" sub="ranked hypotheses + chosen architecture" />
+        <div className="text-center font-mono text-[9px] uppercase tracking-widest text-muted-foreground pt-1">
+          ↻ feedback loop · scientist reviews & re-runs
+        </div>
+      </div>
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Panel 2: Experiment Agent · validation tiers
+// ---------------------------------------------------------------------------
 
 function TierLadder() {
   const tiers = [
@@ -463,12 +467,12 @@ function ArchitectureDiff() {
 export function CoScientistDiagram() {
   return (
     <div className="mt-6 space-y-10">
-      {/* Panel 1 — Main pipeline */}
+      {/* Panel 1 — Multi-agent discovery loop */}
       <div className="border border-border bg-card p-6">
         <div className="font-mono text-tiny uppercase tracking-widest text-muted-foreground mb-4">
-          Pipeline · 8 agents + supervisor + config
+          Multi-agent discovery loop · 6 specialists + GPU Experiment Agent
         </div>
-        <MainPipeline />
+        <DiscoveryLoopDiagram />
       </div>
 
       {/* Panel 2 — Tier ladder */}
