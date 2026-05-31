@@ -200,11 +200,33 @@ function ImportToolbar({
   const [randPrefix, setRandPrefix] = useState("");
   const [randLoading, setRandLoading] = useState(false);
   const [randError, setRandError] = useState<string | null>(null);
+  const [valLoading, setValLoading] = useState<string | null>(null);
 
   const loadDataset = (d: Dataset) => {
     setDataset(d);
     setSteps(d.steps);
     setCursor(0);
+  };
+
+  // Load a HELD-OUT validation example for a family from the backend (honest demo —
+  // not a training sequence). Falls back to the embedded recipe if the backend is down.
+  const loadValidation = async (fam: string) => {
+    setValLoading(fam);
+    try {
+      const s = await api.sample(fam.toLowerCase());
+      loadDataset({
+        id: fam,
+        family: fam,
+        node: `held-out · ${s.steps.length} steps`,
+        description: `Held-out ${fam} example · ${s.split} · ${s.example_id}`,
+        steps: s.steps,
+      });
+    } catch {
+      const d = DATASETS[fam];
+      if (d) loadDataset(d);
+    } finally {
+      setValLoading(null);
+    }
   };
 
   const loadPaste = () => {
@@ -265,39 +287,48 @@ function ImportToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-border bg-card">
+      <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+        Validation set
+      </span>
       <div className="flex items-center gap-1">
         {presets.map((d) => {
           const active = d.id === dataset.id;
           return (
             <button
               key={d.id}
-              onClick={() => loadDataset(d)}
-              className={`px-2.5 py-1 font-mono text-tiny uppercase tracking-widest border ${
+              onClick={() => loadValidation(d.id)}
+              disabled={valLoading === d.id}
+              title={`Load a held-out ${d.id} example from the validation set`}
+              className={`px-2.5 py-1 font-mono text-tiny uppercase tracking-widest border disabled:opacity-50 ${
                 active
                   ? "bg-foreground text-background border-foreground"
                   : "bg-card border-border hover:bg-surface"
               }`}
             >
-              {d.id}
+              {valLoading === d.id ? "…" : d.id}
             </button>
           );
         })}
       </div>
 
       <span className="h-5 w-px bg-border mx-1" />
-
+      <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+        Your own
+      </span>
       <div className="flex items-center gap-1">
         <button
           onClick={() => setPasteOpen(true)}
+          title="Paste ONE sequence — steps separated by newline, comma, ; or |"
           className="px-2.5 py-1 font-mono text-tiny uppercase tracking-widest border border-border bg-card hover:bg-surface"
         >
           ✎ Paste
         </button>
         <button
           onClick={() => fileRef.current?.click()}
+          title="Upload a file with ONE sequence (newline / , / ; / | separated). For a multi-row eval CSV, use the Batch Eval tab."
           className="px-2.5 py-1 font-mono text-tiny uppercase tracking-widest border border-border bg-card hover:bg-surface"
         >
-          ↑ Upload
+          ↑ Upload sequence
         </button>
         <input
           ref={fileRef}
@@ -306,11 +337,19 @@ function ImportToolbar({
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
           className="hidden"
         />
+      </div>
+
+      <span className="h-5 w-px bg-border mx-1" />
+      <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+        Generate
+      </span>
+      <div className="flex items-center gap-1">
         <button
           onClick={() => setRandomOpen(true)}
+          title="Sample a fresh sequence from the model itself (temperature)"
           className="px-2.5 py-1 font-mono text-tiny uppercase tracking-widest border border-border bg-card hover:bg-surface"
         >
-          ⚄ Random
+          ⚄ Model sample
         </button>
       </div>
 
@@ -515,6 +554,7 @@ function PredictTab({
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [latency, setLatency] = useState<number | null>(null);
+  const [topK, setTopK] = useState<1 | 3 | 5>(5);
 
   useEffect(() => {
     let cancelled = false;
@@ -543,7 +583,8 @@ function PredictTab({
 
   const trueNext = steps[cursor + 1] ?? null;
   const top1 = results[0] ?? null;
-  const trueInTop5 = !!trueNext && results.some((r) => r.token === trueNext);
+  const shown = results.slice(0, topK);
+  const trueInTopK = !!trueNext && shown.some((r) => r.token === trueNext);
 
   return (
     <div className="space-y-4">
@@ -557,7 +598,25 @@ function PredictTab({
           <span className="text-foreground">
             "{steps[cursor] ?? "—"}"
           </span>
-          , the model ranks the 5 most likely next steps.
+          , the model ranks its most likely next steps — scored as Top-1 / Top-3 / Top-5 + MRR.
+        </div>
+        <div className="flex items-center gap-2 pt-1">
+          <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+            Show top
+          </span>
+          <div className="flex border border-border">
+            {([1, 3, 5] as const).map((k) => (
+              <button
+                key={k}
+                onClick={() => setTopK(k)}
+                className={`px-2.5 py-0.5 font-mono text-tiny border-r border-border last:border-r-0 ${
+                  topK === k ? "bg-foreground text-background" : "bg-card hover:bg-surface"
+                }`}
+              >
+                {k}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -594,7 +653,7 @@ function PredictTab({
             ))}
           </>
         )}
-        {results.map((r, i) => {
+        {shown.map((r, i) => {
           const isTrue = !!trueNext && r.token === trueNext;
           const isTop = i === 0;
           return (
@@ -659,9 +718,9 @@ function PredictTab({
         <div className="flex items-center justify-between gap-3 flex-wrap pt-1 border-t border-border-strong">
           <div className="text-tiny font-mono text-muted-foreground">
             ✓ = ground-truth next step from the recipe
-            {trueNext && !trueInTop5 && (
+            {trueNext && !trueInTopK && (
               <span className="ml-2 text-[var(--warning,var(--destructive))]">
-                · actual next step not in top 5
+                · actual next step not in top {topK}
               </span>
             )}
           </div>
@@ -701,6 +760,8 @@ function CompleteTab({
     blk: number;
     n: number;
   } | null>(null);
+  const [decoding, setDecoding] = useState<"greedy" | "sampled">("greedy");
+  const [temperature, setTemperature] = useState(0.9);
   const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelled = useRef(false);
 
@@ -734,7 +795,10 @@ function CompleteTab({
     setError(null);
     setRunning(true);
     try {
-      const r = await api.complete(prefix, { greedy: true });
+      const r = await api.complete(prefix, {
+        greedy: decoding === "greedy",
+        temperature,
+      });
       setLatency(r.latency_ms);
       const tr = steps.slice(cursor + 1); // ground-truth remainder of the loaded recipe
       if (tr.length) {
@@ -769,6 +833,45 @@ function CompleteTab({
     <div className="space-y-4">
       <div className="text-tiny font-mono text-muted-foreground">
         Completing {prefix.length}-step prefix → generating up to 220 steps
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-tiny font-mono uppercase tracking-widest text-muted-foreground">
+          Decoding
+        </span>
+        <div className="flex border border-border">
+          {(["greedy", "sampled"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setDecoding(m)}
+              className={`px-2.5 py-1 font-mono text-tiny uppercase tracking-widest border-r border-border last:border-r-0 ${
+                decoding === m ? "bg-foreground text-background" : "bg-card hover:bg-surface"
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+        {decoding === "sampled" && (
+          <span className="flex items-center gap-2 text-tiny font-mono text-muted-foreground">
+            temp
+            <input
+              type="range"
+              min={0.4}
+              max={1.4}
+              step={0.05}
+              value={temperature}
+              onChange={(e) => setTemperature(parseFloat(e.target.value))}
+              className="w-28"
+            />
+            <span className="tabular">{temperature.toFixed(2)}</span>
+          </span>
+        )}
+      </div>
+      <div className="text-tiny font-mono text-muted-foreground leading-relaxed">
+        {decoding === "greedy"
+          ? "Greedy = the model's single best path (argmax). Deterministic — Run again gives the identical output."
+          : "Sampled = drawn from the model's distribution at this temperature. Stochastic — Run again varies."}
       </div>
 
       <div className="flex flex-wrap gap-[3px]">
@@ -1363,6 +1466,25 @@ function BatchEvalTab() {
     }
   };
 
+  // Run the server's OWN held-out eval set for this task — no file needed.
+  const runBuiltin = async (limit?: number) => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setPage(0);
+    setElapsed(null);
+    const t0 = Date.now();
+    try {
+      const data = await api.evalBuiltin(task, limit);
+      setResult({ task, mode: "standard", data } as BatchResult);
+      setElapsed(Date.now() - t0);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const isStandard = result?.mode === "standard";
   const standardRows: (
     | NextStepEval["rows"][number]
@@ -1502,6 +1624,40 @@ function BatchEvalTab() {
         </div>
       </div>
 
+      {/* Option A — run the built-in held-out validation set (no file needed) */}
+      <div className="border border-border bg-card p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="font-mono text-tiny uppercase tracking-widest text-foreground">
+              Run the built-in validation set
+            </div>
+            <div className="text-tiny font-mono text-muted-foreground mt-0.5">
+              The server's own held-out eval for "{task}" — no upload needed.
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => runBuiltin(200)}
+              disabled={loading}
+              className="px-3 py-1.5 font-mono text-tiny uppercase tracking-widest bg-foreground text-background hover:bg-[var(--info)] disabled:opacity-50"
+            >
+              ▶ Quick (200)
+            </button>
+            <button
+              onClick={() => runBuiltin()}
+              disabled={loading}
+              className="px-3 py-1.5 font-mono text-tiny uppercase tracking-widest border border-border bg-card hover:bg-surface disabled:opacity-50"
+            >
+              ▶ Full set
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="text-center font-mono text-tiny uppercase tracking-widest text-muted-foreground">
+        — or upload your own CSV —
+      </div>
+
       <input
         ref={fileRef}
         type="file"
@@ -1512,15 +1668,22 @@ function BatchEvalTab() {
       <button
         onClick={() => fileRef.current?.click()}
         disabled={loading}
-        className="w-full border border-dashed border-border-strong bg-card hover:bg-surface py-10 font-mono text-xs uppercase tracking-widest disabled:opacity-50"
+        className="w-full border border-dashed border-border-strong bg-card hover:bg-surface py-8 font-mono text-xs uppercase tracking-widest disabled:opacity-50"
       >
-        {loading ? "● evaluating…" : "DROP CSV OR CLICK TO UPLOAD"}
+        {loading ? "● evaluating…" : `DROP A "${task}" CSV OR CLICK TO UPLOAD`}
       </button>
 
       <div className="text-tiny font-mono text-muted-foreground space-y-0.5">
-        <div>{csvHelp.nextstep}</div>
-        <div>{csvHelp.completion}</div>
-        <div>{csvHelp.anomaly}</div>
+        <div className="text-foreground">Expected columns for the selected task:</div>
+        <div>{csvHelp[task]}</div>
+        <div className="opacity-60 pt-1">Other tasks:</div>
+        {(["nextstep", "completion", "anomaly"] as const)
+          .filter((t) => t !== task)
+          .map((t) => (
+            <div key={t} className="opacity-60">
+              {csvHelp[t]}
+            </div>
+          ))}
       </div>
 
       {loading && (
@@ -1794,6 +1957,19 @@ function HowJudgesTest() {
             Generalization to an unseen 4th product family is scored post-submission. Batch Eval → OOD
             mode shows per-held-out-family metrics on any CSV with a FAMILY column.
           </div>
+          <div>
+            <div className="text-foreground uppercase tracking-widest mb-1">Glossary</div>
+            <ul className="space-y-0.5">
+              <li>• <span className="text-foreground">Top-1/3/5</span> — the true next step is the model's #1 / within its top-3 / top-5 guesses.</li>
+              <li>• <span className="text-foreground">MRR</span> — mean reciprocal rank of the true step (1.0 = always rank-1).</li>
+              <li>• <span className="text-foreground">Token-acc</span> — fraction of completion positions that exactly match the truth.</li>
+              <li>• <span className="text-foreground">NED</span> — normalized edit distance of the completion (lower is better).</li>
+              <li>• <span className="text-foreground">Block</span> — fraction of 5-step blocks reproduced exactly.</li>
+              <li>• <span className="text-foreground">Validity</span> — % of generated recipes that obey all 10 process rules.</li>
+              <li>• <span className="text-foreground">Anomaly score</span> — P(valid); 1 − score = how anomalous. ROC-AUC ranks valid vs. invalid.</li>
+              <li>• <span className="text-foreground">Greedy vs Sampled</span> — greedy = deterministic single best path; sampled = draws at a temperature.</li>
+            </ul>
+          </div>
           <div className="text-foreground/70">
             Steps are pipe-separated and must use the model's exact 202-token vocabulary.
           </div>
@@ -1850,6 +2026,14 @@ export function ProcessLab() {
             </span>
             <HowJudgesTest />
           </div>
+        </div>
+
+        {/* Start-here hint */}
+        <div className="px-4 py-1.5 border-b border-border bg-card text-tiny font-mono text-muted-foreground">
+          <span className="text-foreground">Start here:</span> pick a{" "}
+          <span className="text-foreground">Validation set</span> family below (loads a held-out recipe),
+          then run a tab — or use <span className="text-foreground">Batch Eval</span> to score a whole CSV.
+          New here? Open <span className="text-foreground">How to test ↗</span>.
         </div>
 
         <ImportToolbar

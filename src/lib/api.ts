@@ -137,11 +137,34 @@ export type OODEval = {
   n: number;
 };
 
+export type Sample = {
+  family: string;
+  example_id: string;
+  steps: string[];
+  index: number;
+  n_available: number;
+  split: string;
+};
+
 export const api = {
   health: () => jget<Health>("/api/health"),
   vocab: () => jget<{ tokens: string[] }>("/api/vocab"),
   rules: () =>
     jget<{ rules: { id: string; description: string }[] }>("/api/rules"),
+
+  // held-out (validation-split) example for a family — no upload needed
+  sample: (family: string, i?: number) =>
+    jget<Sample>(
+      `/api/sample?family=${encodeURIComponent(family)}${i != null ? `&i=${i}` : ""}`,
+    ),
+
+  // run the server's OWN held-out eval set for a task (no upload)
+  evalBuiltin: (task: "nextstep" | "completion" | "anomaly", limit?: number) =>
+    jpost<
+      (NextStepEval | CompletionEval | AnomalyEval) & {
+        builtin?: { task: string; split: string; scored: number; total: number };
+      }
+    >(`/api/eval/builtin?task=${task}${limit != null ? `&limit=${limit}` : ""}`, {}),
 
   predictNextStep: (partial: string[], k = 5) =>
     jpost<{ predictions: Prediction[]; latency_ms: number }>(
