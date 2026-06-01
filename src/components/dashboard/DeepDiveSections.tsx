@@ -34,10 +34,10 @@ function SectionShell({
         >
           {kicker}
         </div>
-        <h2 className="font-serif text-3xl md:text-4xl leading-tight text-white">
+        <h2 className="font-serif text-3xl md:text-4xl leading-tight text-foreground">
           {title}
         </h2>
-        <p className="mt-3 text-sm md:text-base text-slate-400 max-w-3xl leading-relaxed">
+        <p className="mt-3 text-sm md:text-base text-muted-foreground max-w-3xl leading-relaxed">
           {subtitle}
         </p>
         <div className="mt-8">{children}</div>
