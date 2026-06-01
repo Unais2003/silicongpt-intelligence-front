@@ -5,7 +5,7 @@ import { ModelArena } from "@/components/dashboard/ModelArena";
 import { BenchmarkRadar } from "@/components/dashboard/BenchmarkArena";
 import { SystemPromptDialog } from "@/components/dashboard/SystemPromptDialog";
 import { SectionHeading, PageFooter } from "@/components/dashboard/layout";
-import { DeepDiveSections } from "@/components/dashboard/DeepDiveSections";
+
 
 export const Route = createFileRoute("/_app/")({
   head: () => ({
@@ -50,7 +50,6 @@ function Overview() {
         </section>
       </div>
 
-      <DeepDiveSections />
 
       <PageFooter />
     </main>
