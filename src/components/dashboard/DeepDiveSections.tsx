@@ -24,9 +24,9 @@ function SectionShell({
 }) {
   return (
     <section
-      className="px-4 md:px-6 lg:px-10 py-14 text-white"
-      style={{ backgroundColor: NAVY }}
+      className="px-4 md:px-6 lg:px-10 py-14 border-t border-border bg-surface text-white"
     >
+
       <div className="max-w-7xl mx-auto">
         <div
           className="font-mono text-tiny uppercase tracking-widest mb-3"
