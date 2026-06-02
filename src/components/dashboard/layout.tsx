@@ -48,7 +48,7 @@ export function SectionHeading({
 }: {
   kicker: string;
   title: string;
-  desc: React.ReactNode;
+  desc: string;
 }) {
   return (
     <div className="flex items-end justify-between gap-6 mb-3">
