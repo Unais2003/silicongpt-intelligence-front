@@ -267,6 +267,13 @@ function Section2Pipeline() {
           desc="Each round flows from configuration through eight specialized agents and back. Hover any node to inspect its contract."
         />
 
+        <img
+          src={agentOrchestration}
+          alt="SiliconGPT Co-Scientist Lab — agent orchestration: Supervisor plus seven specialists (Generation, Reflection, Experiment, Proximity, Ranking, Evolution, Meta-review), the three-tier validation ladder, and the Leonardo batch boundary."
+          className="mb-8 w-full h-auto rounded-xl border border-border shadow-sm"
+        />
+
+
         {/* top: config + supervisor */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
           <div className="bg-card border-l-2 px-4 py-3" style={{ borderLeftColor: GREEN }}>
