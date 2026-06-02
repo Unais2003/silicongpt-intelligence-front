@@ -722,7 +722,12 @@ export function CoScientistDiagram() {
         <div className="font-mono text-tiny uppercase tracking-widest text-muted-foreground mb-4">
           Multi-agent discovery loop · 6 specialists + GPU Experiment Agent
         </div>
-        <DiscoveryLoopDiagram />
+        <img
+          src={agentOrchestration.url}
+          alt="SiliconGPT Co-Scientist Lab discovery loop: Supervisor orchestrating Generation, Reflection, Experiment, Proximity, Ranking, Evolution, and Meta-review agents across a tiered validation ladder."
+          className="w-full h-auto"
+          loading="lazy"
+        />
       </div>
 
       {/* Panel 2 — Tier ladder */}
