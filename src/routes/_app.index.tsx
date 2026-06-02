@@ -6,7 +6,6 @@ import { BenchmarkRadar } from "@/components/dashboard/BenchmarkArena";
 import { SystemPromptDialog } from "@/components/dashboard/SystemPromptDialog";
 import { SectionHeading, PageFooter } from "@/components/dashboard/layout";
 
-
 export const Route = createFileRoute("/_app/")({
   head: () => ({
     meta: [
@@ -38,7 +37,7 @@ function Overview() {
           <SectionHeading
             kicker="§ 01 · Benchmark · Hack_01 Process Logic"
             title="Head-to-head against frontier LLMs."
-            desc="A 1.37M from-scratch decoder vs. an n-gram baseline and four frontier LLMs — on next-step, completion, and anomaly."
+            desc={<>A <span className="font-semibold text-foreground text-[15px]">1.37M</span> from-scratch decoder vs. an n-gram baseline and four frontier LLMs — on next-step, completion, and anomaly.</>}
           />
           <div className="mt-3 mb-5">
             <SystemPromptDialog />
@@ -49,7 +48,6 @@ function Overview() {
           </div>
         </section>
       </div>
-
 
       <PageFooter />
     </main>
