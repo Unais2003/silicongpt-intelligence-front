@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
-import { CoScientistDiagram } from "./CoScientistDiagram";
+import agentOrchestration from "@/assets/agent_orchestration.png";
 
 /* ============================================================================
    How SiliconGPT was discovered — one linear story for the demo.
    1 Hero · 2 The model we started with + the problem · 3 The discovery engine
    (multi-agent loop + Experiment agent + GPU experiments + V1→final) · 4 Outcome.
-   The engine diagram/tiers/results live in <CoScientistDiagram/> (reused).
+   The engine diagram (loop + tiers + Leonardo boundary) is the agent_orchestration.png image.
    ========================================================================= */
 
 const GREEN = "var(--success)";
@@ -186,7 +186,11 @@ function Engine() {
           title="A measurement-grounded multi-agent loop."
           desc="One Supervisor orchestrates seven specialists (the six from Google's AI Co-Scientist + our GPU Experiment agent). Ideas are debated, then actually trained and benchmarked on A100s — so the tournament ranks on measured OOD, not argument. Below: the loop, the three-tier validation ladder, and every lever it tested with real numbers."
         />
-        <CoScientistDiagram />
+        <img
+          src={agentOrchestration}
+          alt="SiliconGPT Co-Scientist Lab — the agent orchestration: a Supervisor plus seven specialists (Generation, Reflection, Experiment, Proximity, Ranking, Evolution, Meta-review), the three-tier validation ladder, and the Leonardo batch boundary."
+          className="mt-8 w-full h-auto rounded-xl border border-border shadow-sm"
+        />
       </div>
     </section>
   );
