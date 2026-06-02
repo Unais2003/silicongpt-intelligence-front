@@ -4,6 +4,7 @@
 // GPU Experiment Agent as a 7th specialist with explicit wiring to the
 // Supervisor and the GPU Workers.
 // ---------------------------------------------------------------------------
+import agentOrchestration from "@/assets/agent_orchestration.png.asset.json";
 
 const STROKE = "var(--border-strong)";
 const STROKE_MUTED = "var(--border)";
