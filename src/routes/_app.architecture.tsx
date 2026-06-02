@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { DiscoveryArchitecture } from "@/components/dashboard/DiscoveryArchitecture";
+import { DeepDiveSections } from "@/components/dashboard/DeepDiveSections";
 import { PageFooter } from "@/components/dashboard/layout";
 
 export const Route = createFileRoute("/_app/architecture")({
@@ -27,6 +28,7 @@ function ArchitecturePage() {
   return (
     <main className="flex-1">
       <DiscoveryArchitecture />
+      <DeepDiveSections />
       <PageFooter />
     </main>
   );

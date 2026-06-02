@@ -6,6 +6,7 @@ import { BenchmarkRadar } from "@/components/dashboard/BenchmarkArena";
 import { SystemPromptDialog } from "@/components/dashboard/SystemPromptDialog";
 import { SectionHeading, PageFooter } from "@/components/dashboard/layout";
 
+
 export const Route = createFileRoute("/_app/")({
   head: () => ({
     meta: [
@@ -48,6 +49,7 @@ function Overview() {
           </div>
         </section>
       </div>
+
 
       <PageFooter />
     </main>
