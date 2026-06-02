@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
+import agentOrchestration from "@/assets/agent_orchestration.png";
 
 /* ============================================================================
    DiscoveryArchitecture — 8 sections describing how SiliconGPT was discovered.
