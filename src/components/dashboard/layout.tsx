@@ -109,6 +109,15 @@ export function PageFooter() {
           <span>BUILD 0x4a91e7</span>
           <span>·</span>
           <span>WAFERBENCH 0.4</span>
+          <span>·</span>
+          <a
+            href="https://github.com/Jaseelkt007/SiliconGPT"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground transition-colors underline underline-offset-2"
+          >
+            GITHUB
+          </a>
         </div>
         <div className="flex items-center gap-4">
           <span>© 2026 SiliconGPT Research</span>
