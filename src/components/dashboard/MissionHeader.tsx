@@ -46,7 +46,7 @@ export function MissionHeader() {
     <header className="border-b border-border-strong bg-card">
 
       {/* Brand row */}
-      <div className="flex items-stretch">
+      <div className="flex items-stretch justify-between">
         <div className="flex items-center gap-5 px-6 py-5 border-r border-border">
           <img
             src={logo}
@@ -63,6 +63,16 @@ export function MissionHeader() {
           </div>
         </div>
 
+        <a
+          href="https://github.com/Jaseelkt007/SiliconGPT"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-6 py-5 border-l border-border text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="GitHub repository"
+        >
+          <Github size={18} />
+          <span className="font-mono text-tiny uppercase tracking-widest hidden sm:inline">GitHub</span>
+        </a>
       </div>
 
       {/* Ticker */}
