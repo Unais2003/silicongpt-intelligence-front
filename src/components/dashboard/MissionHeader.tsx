@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Github } from "lucide-react";
 import { StatusDot } from "./primitives";
 import logo from "@/assets/silicongpt-logo.png";
 
